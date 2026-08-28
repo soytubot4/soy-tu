@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
 /**
- * Export estático: `next build` deja el sitio listo en `out/`.
+ * Ya no es export estático.
  *
- * Es lo mismo que usa la landing de soytubot. En App Platform va con build
- * command `npm run build` y output directory `out`.
+ * La home (soytu.com.ar) sigue siendo la landing, pero ahora el proyecto también
+ * sirve el superadmin en app.soytu.com.ar, que necesita servidor: lee la base
+ * compartida y valida la sesión.
  */
 const nextConfig: NextConfig = {
-  output: "export",
   images: { unoptimized: true },
 };
 
