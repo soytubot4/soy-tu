@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/**
+ * Blanco y negro, sin medias tintas.
+ *
+ * Los grises son los únicos tonos: no hay color de acento a propósito. Cuando
+ * todo es blanco y negro, un borde que cambia ya es suficiente señal.
+ *
+ * Sigue el tema del sistema operativo: negro por defecto, blanco si el visitante
+ * tiene el equipo en claro.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-card: var(--card);
+  --font-sans: var(--font-geist);
+}
+
+:root {
+  --bg: #000000;
+  --fg: #ffffff;
+  --muted: #888888;
+  --line: #1f1f1f;
+  --line-strong: #333333;
+  --card: #0a0a0a;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --fg: #000000;
+    --muted: #666666;
+    --line: #eaeaea;
+    --line-strong: #d4d4d4;
+    --card: #fafafa;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  letter-spacing: -0.011em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+}

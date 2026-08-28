@@ -2,16 +2,35 @@
 
 Sitio de la suite. Explica los seis productos y cómo se combinan.
 
-Es **HTML plano, un solo archivo**: sin build, sin dependencias y sin `node_modules`.
-Se abre haciendo doble clic en `index.html` y se sube tal cual a cualquier lado
-(Vercel, Netlify, un bucket, el hosting que sea). No hay nada que compilar, así
-que tampoco hay nada que se pueda romper en un deploy.
+Mismo stack que el resto de las webs: **Next 16 + React 19 + Tailwind 4**, con
+`output: "export"` — o sea que `next build` deja un sitio estático en `out/`.
 
 ## Ver en local
 
-Doble clic en `index.html`, o si preferís un servidor:
+    npm install
+    npm run dev
 
-    npx serve .
+## Deploy
+
+| Campo | Valor |
+|---|---|
+| Build command | `npm run build` |
+| Output directory | `out` |
+
+## Se cachea entero
+
+Hay un service worker (`public/sw.js`) que guarda el sitio la primera vez que
+alguien entra: las visitas siguientes abren al instante y andan sin conexión.
+Usa *stale-while-revalidate*, así que sirve lo cacheado y en paralelo busca la
+versión nueva para la próxima.
+
+**Al publicar cambios importantes hay que subirle la versión al caché**
+(`const CACHE = "soytu-v1"` en `public/sw.js`). Si no, el que ya entró antes
+puede quedarse con la versión vieja.
+
+Solo se registra en producción: en desarrollo un service worker sirviendo assets
+viejos mientras editás es la forma más rápida de perder una hora buscando un bug
+que no existe.
 
 ## Notas
 
