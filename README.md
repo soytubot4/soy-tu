@@ -7,14 +7,14 @@ Mismo stack que el resto de las webs: **Next 16 + React 19 + Tailwind 4**, con
 
 ## Ver en local
 
-    npm install
-    npm run dev
+    yarn
+    yarn dev
 
 ## Deploy
 
 | Campo | Valor |
 |---|---|
-| Build command | `npm run build` |
+| Build command | `yarn build` |
 | Output directory | `out` |
 
 ## Se cachea entero
