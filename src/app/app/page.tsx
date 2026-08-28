@@ -1,6 +1,8 @@
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { PRODUCTOS } from '@/lib/productos';
+import { AL_NO_PAGAR, estadoDe, type EstadoPago } from '@/lib/suscripciones';
+import { esPrueba } from '@/lib/mercadopago';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ export default async function Panel() {
   const tenants = await prisma.tenant.findMany({
     orderBy: [{ active: 'desc' }, { createdAt: 'desc' }],
     take: 500,
+    include: { subscription: { select: { status: true, paidUntil: true, amount: true } } },
   });
 
   const porProducto = PRODUCTOS.map((p) => ({
@@ -33,6 +36,7 @@ export default async function Panel() {
     total: tenants.filter((t) => t.enabledProducts.includes(p.key) && t.active).length,
   }));
   const activos = tenants.filter((t) => t.active).length;
+  const vencidos = tenants.filter((t) => estadoDe(t.subscription) === 'vencido').length;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -42,6 +46,17 @@ export default async function Panel() {
           {activos} activos de {tenants.length} en total, en los cinco productos.
         </p>
         <p className="mt-1 text-[13px] text-muted">{admin.fullName ?? admin.email}</p>
+        {vencidos > 0 && (
+          <p className="mt-3 text-[13px] text-amber-500">
+            {vencidos} {vencidos === 1 ? 'comercio vencido' : 'comercios vencidos'}
+            {AL_NO_PAGAR === 'avisar' && ' · siguen funcionando: hoy solo se avisa'}
+          </p>
+        )}
+        {esPrueba() && (
+          <p className="mt-1 text-[13px] text-amber-500">
+            Mercado Pago está en modo prueba: los cobros no son reales.
+          </p>
+        )}
       </header>
 
       <div className="mb-10 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-5">
@@ -61,6 +76,7 @@ export default async function Panel() {
             <tr className="border-b border-line text-left text-[13px] text-muted">
               <th className="px-4 py-3 font-medium">Comercio</th>
               <th className="px-4 py-3 font-medium">Productos</th>
+              <th className="px-4 py-3 font-medium">Pago</th>
               <th className="px-4 py-3 font-medium">Dueño</th>
               <th className="px-4 py-3 font-medium">Alta</th>
             </tr>
@@ -88,6 +104,9 @@ export default async function Panel() {
                     {!t.enabledProducts.length && <span className="text-[13px] text-muted">—</span>}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  <EstadoDePago estado={estadoDe(t.subscription)} hasta={t.subscription?.paidUntil ?? null} />
+                </td>
                 <td className="px-4 py-3 text-muted">{t.ownerEmail ?? t.email ?? '—'}</td>
                 <td className="px-4 py-3 tabular-nums text-muted">{fecha(t.createdAt)}</td>
               </tr>
@@ -96,5 +115,28 @@ export default async function Panel() {
         </table>
       </div>
     </main>
+  );
+}
+
+const ESTADOS: Record<EstadoPago, { texto: string; clase: string }> = {
+  'al-dia': { texto: 'Al día', clase: 'text-emerald-500' },
+  'por-vencer': { texto: 'Por vencer', clase: 'text-amber-500' },
+  prueba: { texto: 'En prueba', clase: 'text-muted' },
+  vencido: { texto: 'Vencido', clase: 'text-red-500' },
+  'sin-suscripcion': { texto: 'Sin suscripción', clase: 'text-muted' },
+};
+
+/** El estado de pago, con la fecha cuando la hay: "vencido" sin fecha no sirve. */
+function EstadoDePago({ estado, hasta }: { estado: EstadoPago; hasta: Date | null }) {
+  const e = ESTADOS[estado];
+  return (
+    <span>
+      <span className={`block text-[13px] font-medium ${e.clase}`}>{e.texto}</span>
+      {hasta && (
+        <span className="text-[11px] text-muted tabular-nums">
+          {new Date(hasta).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+        </span>
+      )}
+    </span>
   );
 }

@@ -63,8 +63,41 @@ Service con `yarn build` y `yarn start`, y estas variables:
     NEXT_PUBLIC_SUPABASE_URL
     NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+## Suscripciones (Mercado Pago)
+
+Se usa **preapproval**, no Checkout Pro: es lo único que cobra todos los meses
+solo y reintenta si a un comercio le rebota la tarjeta.
+
+    MP_ACCESS_TOKEN            # con TEST- adelante, es sandbox
+    NEXT_PUBLIC_MP_PUBLIC_KEY
+    SOYTU_AL_NO_PAGAR          # avisar (default) | solo-lectura | suspender
+
+**Webhook**: en Mercado Pago hay que apuntar las notificaciones a
+`https://app.soytu.com.ar/api/mercadopago/webhook`. Siempre contesta 200 aunque
+falle: si se le devuelve error, Mercado Pago reintenta durante días y termina
+desactivando la notificación.
+
+**No se confía en el cuerpo del aviso.** Trae solo un id y el detalle se va a
+buscar a la API, así un aviso falsificado no puede marcar a nadie como pago. Los
+pagos se guardan con upsert por el id de Mercado Pago, porque el mismo aviso
+puede llegar dos veces.
+
+**`external_reference` lleva el id del comercio.** Es lo único que después
+permite cruzar un pago con un cliente nuestro.
+
+### Qué pasa cuando no pagan
+
+Hoy: **solo se avisa**. Se marca vencido y se ve en el panel, pero el comercio
+sigue funcionando. Está así a propósito hasta que se decida — cortarle el sistema
+a un bar en medio de un sábado a la noche es una decisión de negocio.
+
+Las otras dos opciones (`solo-lectura` y `suspender`) están declaradas pero **sin
+implementar**: hay que decidir primero.
+
 ### Lo que falta
 
-Suscripciones de Mercado Pago, que es el motivo por el que existe este panel. Y
-antes de eso hay que decidir **qué pasa cuando un comercio no paga**: si se
-suspende, si queda en solo lectura, o si solo se avisa.
+- Probar un cobro de punta a punta. La app de Mercado Pago tiene que tener
+  suscripciones habilitadas; hasta que eso esté, `/preapproval` responde
+  "User bad request".
+- Mandarle el link de pago al comerciante (hoy lo genera el superadmin a mano).
+- Implementar `solo-lectura` y `suspender`.

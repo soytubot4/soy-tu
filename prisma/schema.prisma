@@ -26,6 +26,9 @@ model Tenant {
   ownerName       String?  @map("owner_name")
   createdAt       DateTime @default(now()) @map("created_at")
 
+  subscription Subscription?
+  payments     SubscriptionPayment[]
+
   @@map("tenants")
 }
 
@@ -41,4 +44,43 @@ model AdminUser {
   active         Boolean @default(true)
 
   @@map("admin_users")
+}
+
+/// El estado de pago de un comercio. Ver `sql/01-suscripciones.sql`.
+model Subscription {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @unique @map("tenant_id") @db.Uuid
+  /// 'PRUEBA' | 'authorized' | 'paused' | 'cancelled' | 'VENCIDA'
+  status          String    @default("PRUEBA")
+  paidUntil       DateTime? @map("paid_until")
+  amount          Decimal?  @db.Decimal(14, 2)
+  currency        String    @default("ARS")
+  mpPreapprovalId String?   @unique @map("mp_preapproval_id")
+  mpPayerEmail    String?   @map("mp_payer_email")
+  lastEvent       Json?     @map("last_event")
+  lastEventAt     DateTime? @map("last_event_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+/// Cada cobro. Aparte de la suscripcion porque hay uno por mes.
+model SubscriptionPayment {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  mpPaymentId String?   @unique @map("mp_payment_id")
+  status      String
+  amount      Decimal?  @db.Decimal(14, 2)
+  currency    String    @default("ARS")
+  paidAt      DateTime? @map("paid_at")
+  raw         Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("subscription_payments")
 }
