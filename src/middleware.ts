@@ -13,6 +13,9 @@ import { NextResponse, type NextRequest } from 'next/server';
  * se reescribe. Si alguien entra a soytu.com.ar/app se lo manda a la landing —
  * hay una sola puerta al panel y es el subdominio.
  */
+/** Lo que es del panel y no tiene por qué existir en el dominio público. */
+const PANEL = ['/app', '/products', '/tenants', '/login'];
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
   const esPanel = host.startsWith('app.');
@@ -25,8 +28,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // Fuera del subdominio, /app no existe.
-  if (pathname === '/app' || pathname.startsWith('/app/')) {
+  // Fuera del subdominio, el panel no existe. El gate de superadmin igual lo
+  // protege, pero una sola puerta es más fácil de razonar que dos.
+  if (PANEL.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);

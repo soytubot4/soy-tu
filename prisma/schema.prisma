@@ -26,8 +26,9 @@ model Tenant {
   ownerName       String?  @map("owner_name")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  subscription Subscription?
-  payments     SubscriptionPayment[]
+  subscriptions Subscription[]
+  payments      SubscriptionPayment[]
+  logs          SubscriptionLog[]
 
   @@map("tenants")
 }
@@ -42,56 +43,97 @@ enum AdminUserType {
 }
 
 model AdminUser {
-  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  supabaseUserId String  @unique @map("supabase_user_id") @db.Uuid
-  email          String  @unique
-  fullName       String? @map("full_name")
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supabaseUserId String        @unique @map("supabase_user_id") @db.Uuid
+  email          String        @unique
+  fullName       String?       @map("full_name")
   /// Acá solo entra SUPERADMIN.
   type           AdminUserType
-  active         Boolean @default(true)
+  active         Boolean       @default(true)
 
   @@map("admin_users")
 }
 
 /// El estado de pago de un comercio. Ver `sql/01-suscripciones.sql`.
+/// Lo que un comercio paga por UN producto. Un comercio con soytuadmin y
+/// soytuturno tiene dos, cada una con su plan y su precio.
 model Subscription {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId        String    @unique @map("tenant_id") @db.Uuid
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  productId       String?        @map("product_id") @db.Uuid
   /// 'PRUEBA' | 'authorized' | 'paused' | 'cancelled' | 'VENCIDA'
-  status          String    @default("PRUEBA")
-  paidUntil       DateTime? @map("paid_until")
-  amount          Decimal?  @db.Decimal(14, 2)
-  currency        String    @default("ARS")
-  billingPeriodId String?   @map("billing_period_id") @db.Uuid
+  status          String         @default("PRUEBA")
+  paidUntil       DateTime?      @map("paid_until")
+  amount          Decimal?       @db.Decimal(14, 2)
+  currency        String         @default("ARS")
+  billingPeriodId String?        @map("billing_period_id") @db.Uuid
   billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id])
-  mpPreapprovalId String?   @unique @map("mp_preapproval_id")
-  mpPayerEmail    String?   @map("mp_payer_email")
-  lastEvent       Json?     @map("last_event")
-  lastEventAt     DateTime? @map("last_event_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  startedAt       DateTime?      @map("started_at")
+  trialEndsAt     DateTime?      @map("trial_ends_at")
+  cancelledAt     DateTime?      @map("cancelled_at")
+  notes           String?
+  mpPreapprovalId String?        @unique @map("mp_preapproval_id")
+  mpPayerEmail    String?        @map("mp_payer_email")
+  lastEvent       Json?          @map("last_event")
+  lastEventAt     DateTime?      @map("last_event_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  BillingProduct?       @relation(fields: [productId], references: [id])
+  payments SubscriptionPayment[]
+  logs     SubscriptionLog[]
 
+  @@unique([tenantId, productId])
   @@map("subscriptions")
 }
 
 /// Cada cobro. Aparte de la suscripcion porque hay uno por mes.
 model SubscriptionPayment {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId    String    @map("tenant_id") @db.Uuid
-  mpPaymentId String?   @unique @map("mp_payment_id")
-  status      String
-  amount      Decimal?  @db.Decimal(14, 2)
-  currency    String    @default("ARS")
-  paidAt      DateTime? @map("paid_at")
-  raw         Json?
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  mpPaymentId    String?   @unique @map("mp_payment_id")
+  status         String
+  amount         Decimal?  @db.Decimal(14, 2)
+  currency       String    @default("ARS")
+  paidAt         DateTime? @map("paid_at")
+  method         String?
+  description    String?
+  /// Con qué dólar se convirtió, cuando el plan está en USD.
+  fxRate         Decimal?  @map("fx_rate") @db.Decimal(14, 2)
+  raw            Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  subscriptionId String?   @map("subscription_id") @db.Uuid
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
 
   @@index([tenantId, createdAt])
+  @@index([subscriptionId, createdAt])
   @@map("subscription_payments")
+}
+
+/// Qué le pasó a una suscripción, aparte de la plata.
+///
+/// Los pagos dicen cuánto entró; esto dice por qué: se contrató, cambió de plan,
+/// se pausó, falló un cobro. Es lo que se mira cuando un comercio pregunta.
+model SubscriptionLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  subscriptionId String?  @map("subscription_id") @db.Uuid
+  /// 'creada' | 'plan-cambiado' | 'pago' | 'pago-rechazado' | 'pausada' | 'cancelada' | 'nota'
+  kind           String
+  description    String
+  data           Json?
+  /// Quién lo hizo. NULL = lo hizo Mercado Pago, no una persona.
+  actorEmail     String?  @map("actor_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("subscription_logs")
 }
 
 /// Qué se vende. Ver `sql/02-productos-y-planes.sql`.
@@ -106,7 +148,8 @@ model BillingProduct {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  plans BillingPlan[]
+  plans         BillingPlan[]
+  subscriptions Subscription[]
 
   @@map("billing_products")
 }

@@ -49,28 +49,36 @@ export type Preapproval = {
 /**
  * Crea la suscripción y devuelve el link a donde mandar al comerciante.
  *
- * `external_reference` lleva el id del comercio: es lo ÚNICO que después permite
- * cruzar un webhook con un cliente nuestro. Sin eso llega un pago y no se sabe
- * de quién es.
+ * `external_reference` lleva el id de NUESTRA suscripción, no el del comercio.
+ * Un comercio puede pagar soytuadmin y soytuturno por separado: con el id del
+ * comercio llegaría un pago y no se sabría cuál de los dos pagó.
+ *
+ * `mesesPorCobro` es la frecuencia real del plan: un plan trimestral se cobra
+ * cada 3 meses, no todos los meses. Mandarlo mensual le cobraría al comerciante
+ * el precio del trimestre doce veces al año.
  */
 export function createSubscription(params: {
-  tenantId: string;
+  subscriptionId: string;
   nombreComercio: string;
+  detalle: string;
   emailPagador: string;
-  montoMensual: number;
+  monto: number;
+  mesesPorCobro: number;
   volverA: string;
 }) {
   return mp<Preapproval>('/preapproval', {
     method: 'POST',
     body: JSON.stringify({
-      reason: `soytu · ${params.nombreComercio}`,
-      external_reference: params.tenantId,
+      reason: `soytu · ${params.nombreComercio} · ${params.detalle}`,
+      external_reference: params.subscriptionId,
       payer_email: params.emailPagador,
       back_url: params.volverA,
       auto_recurring: {
-        frequency: 1,
+        frequency: params.mesesPorCobro,
         frequency_type: 'months',
-        transaction_amount: params.montoMensual,
+        // Siempre en pesos: Mercado Pago cobra en moneda local. Lo que se cotiza
+        // en dolares ya viene convertido al oficial del dia.
+        transaction_amount: params.monto,
         currency_id: 'ARS',
       },
       status: 'pending',

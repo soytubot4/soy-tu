@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { PRODUCTS } from '@/lib/products';
 import { LogoutButton } from './logout-button';
 import { EditableRow } from './tenant-row';
-import { ON_UNPAID, statusOf, type PaymentState } from '@/lib/subscriptions';
+import { ON_UNPAID, worstStatus, type PaymentState } from '@/lib/subscriptions';
 import { isSandbox } from '@/lib/mercadopago';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,9 @@ export default async function Panel() {
   const tenants = await prisma.tenant.findMany({
     orderBy: [{ active: 'desc' }, { createdAt: 'desc' }],
     take: 500,
-    include: { subscription: { select: { status: true, paidUntil: true, amount: true } } },
+    include: {
+      subscriptions: { select: { status: true, paidUntil: true, amount: true, currency: true } },
+    },
   });
 
   const porProducto = PRODUCTS.map((p) => ({
@@ -38,7 +40,7 @@ export default async function Panel() {
     total: tenants.filter((t) => t.enabledProducts.includes(p.key) && t.active).length,
   }));
   const activos = tenants.filter((t) => t.active).length;
-  const vencidos = tenants.filter((t) => statusOf(t.subscription) === 'vencido').length;
+  const vencidos = tenants.filter((t) => worstStatus(t.subscriptions) === 'vencido').length;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -96,7 +98,9 @@ export default async function Panel() {
             {tenants.map((t) => (
               <EditableRow key={t.id} t={t}>
                 <td className="px-4 py-3">
-                  <span className="block font-medium">{t.name}</span>
+                  <a href={`/tenants/${t.id}`} className="block font-medium hover:underline">
+                    {t.name}
+                  </a>
                   <span className="text-[13px] text-muted">
                     {t.slug}
                     {!t.active && ' · dado de baja'}
@@ -116,7 +120,10 @@ export default async function Panel() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <PaymentStatus estado={statusOf(t.subscription)} hasta={t.subscription?.paidUntil ?? null} />
+                  <PaymentStatus
+                    estado={worstStatus(t.subscriptions)}
+                    hasta={proximoVencimiento(t.subscriptions)}
+                  />
                 </td>
                 <td className="px-4 py-3 text-muted">{t.ownerEmail ?? t.email ?? '—'}</td>
                 <td className="px-4 py-3 tabular-nums text-muted">{fecha(t.createdAt)}</td>
@@ -136,6 +143,13 @@ const STATUS_LABELS: Record<PaymentState, { texto: string; clase: string }> = {
   vencido: { texto: 'Vencido', clase: 'text-red-500' },
   'sin-suscripcion': { texto: 'Sin suscripción', clase: 'text-muted' },
 };
+
+/** La fecha que primero se vence: es la que hay que mirar. */
+function proximoVencimiento(subs: { paidUntil: Date | null }[]): Date | null {
+  const fechas = subs.map((s) => s.paidUntil).filter((d): d is Date => !!d);
+  if (!fechas.length) return null;
+  return fechas.reduce((a, b) => (new Date(a) < new Date(b) ? a : b));
+}
 
 /** El estado de pago, con la fecha cuando la hay: "vencido" sin fecha no sirve. */
 function PaymentStatus({ estado, hasta }: { estado: PaymentState; hasta: Date | null }) {
