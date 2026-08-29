@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { createSubscription } from '@/lib/mercadopago';
+import { backUrl, createSubscription } from '@/lib/mercadopago';
 import { money, monthsOf, officialRate, toPesos } from '@/lib/billing';
 import { log } from '@/lib/subscriptions';
 
@@ -140,15 +140,40 @@ export async function POST(req: Request) {
     return a;
   });
 
-  const pre = await createSubscription({
-    subscriptionId: acuerdo.id,
-    nombreComercio: tenant.name,
-    detalle,
-    emailPagador: email,
-    monto: enPesos,
-    mesesPorCobro: meses[0]!,
-    volverA: `${new URL(req.url).origin}/app`,
-  });
+  let pre;
+  try {
+    pre = await createSubscription({
+      subscriptionId: acuerdo.id,
+      nombreComercio: tenant.name,
+      detalle,
+      emailPagador: email,
+      monto: enPesos,
+      mesesPorCobro: meses[0]!,
+      volverA: backUrl(new URL(req.url).origin),
+    });
+  } catch (e) {
+    // El acuerdo queda sin preapproval y no sirve para nada: se borra para que
+    // no aparezca en la ficha como un débito que en realidad no existe.
+    await prisma.billingAgreement.delete({ where: { id: acuerdo.id } }).catch(() => {});
+
+    const msg = (e as Error).message;
+    if (msg.includes('Payer and collector cannot be the same')) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `${email} es la misma cuenta con la que cobrás en Mercado Pago, y nadie se puede cobrar a sí mismo. Cambiale el mail al comercio.`,
+        },
+        { status: 400 },
+      );
+    }
+    if (msg.includes('back_url')) {
+      return NextResponse.json(
+        { ok: false, error: 'Mercado Pago rechazó la URL de vuelta. Revisá SOYTU_APP_URL.' },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ ok: false, error: msg }, { status: 502 });
+  }
 
   await prisma.billingAgreement.update({
     where: { id: acuerdo.id },

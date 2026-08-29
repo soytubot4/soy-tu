@@ -18,6 +18,19 @@ function token(): string {
 /** Si estamos con credenciales de prueba. Sirve para avisarlo en el panel. */
 export const isSandbox = () => (process.env.MP_ACCESS_TOKEN ?? '').startsWith('TEST-');
 
+/**
+ * A dónde vuelve el comerciante después de cargar la tarjeta.
+ *
+ * Mercado Pago valida la URL y rechaza `http://localhost`, así que en desarrollo
+ * no sirve el origen del request: hay que mandarle una pública igual. Se
+ * configura con SOYTU_APP_URL y se cae al dominio real, que siempre es válido.
+ */
+export function backUrl(origen: string) {
+  const publica = process.env.SOYTU_APP_URL;
+  if (publica) return `${publica.replace(/\/$/, '')}/app`;
+  return /^https:\/\//.test(origen) ? `${origen}/app` : 'https://app.soytu.com.ar/app';
+}
+
 async function mp<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,
