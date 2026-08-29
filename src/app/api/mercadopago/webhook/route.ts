@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { procesarAviso } from '@/lib/suscripciones';
+import { firmaValida } from '@/lib/mp-firma';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,13 @@ export async function POST(req: Request) {
   const tipo = cuerpo.type ?? cuerpo.action?.split('.')[0] ?? '';
   const id = cuerpo.data?.id;
   if (!tipo || !id) return NextResponse.json({ ok: true, ignorado: 'sin tipo o id' });
+
+  // Si la firma no cierra, el aviso no es de Mercado Pago. Se descarta sin ir a
+  // la API: si no, cualquiera que descubra esta URL nos hace pegar consultas.
+  if (!firmaValida(req.headers, String(id))) {
+    console.warn('[mp] aviso con firma invalida, descartado');
+    return NextResponse.json({ ok: true, ignorado: 'firma invalida' });
+  }
 
   try {
     const r = await procesarAviso(tipo, String(id));
