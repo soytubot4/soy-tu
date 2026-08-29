@@ -1,10 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
- * Verifica que el aviso lo mandó Mercado Pago y no cualquiera que descubrió la
+ * Verifica que el aviso lo mandó Mercado Payment y no cualquiera que descubrió la
  * URL del webhook.
  *
- * Mercado Pago firma con la clave secreta que se genera en el panel. El manifest
+ * Mercado Payment firma con la clave secreta que se genera en el panel. El manifest
  * que se firma es `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` — el orden y
  * los puntos y coma importan, cualquier diferencia da otra firma.
  *
@@ -13,7 +13,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  * dejaría de registrarse cada cobro sin que nadie se entere. El webhook igual no
  * confía en el cuerpo: va a buscar el detalle a la API.
  */
-export function firmaValida(headers: Headers, dataId: string): boolean {
+export function isValidSignature(headers: Headers, dataId: string): boolean {
   const secreto = process.env.MP_WEBHOOK_SECRET;
   if (!secreto) return true;
 

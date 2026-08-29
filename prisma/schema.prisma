@@ -34,13 +34,20 @@ model Tenant {
 
 /// Quién puede entrar acá. Es la MISMA tabla que usan los otros productos, así
 /// que el superadmin de soytu es el mismo que ya existe, no uno nuevo.
+/// Es un enum de Postgres, no texto: declararlo como String hace que Prisma
+/// falle al leerlo ("incompatible value of SUPERADMIN").
+enum AdminUserType {
+  SUPERADMIN
+  TENANT_ADMIN
+}
+
 model AdminUser {
   id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   supabaseUserId String  @unique @map("supabase_user_id") @db.Uuid
   email          String  @unique
   fullName       String? @map("full_name")
-  /// 'SUPERADMIN' | 'TENANT_ADMIN'. Acá solo entra el primero.
-  type           String
+  /// Acá solo entra SUPERADMIN.
+  type           AdminUserType
   active         Boolean @default(true)
 
   @@map("admin_users")

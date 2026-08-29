@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { crearSuscripcion } from '@/lib/mercadopago';
+import { createSubscription } from '@/lib/mercadopago';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,13 +29,13 @@ export async function POST(req: Request) {
   const email = tenant.ownerEmail ?? tenant.email;
   if (!email) {
     return NextResponse.json(
-      { ok: false, error: 'Ese comercio no tiene mail cargado: Mercado Pago lo necesita' },
+      { ok: false, error: 'Ese comercio no tiene mail cargado: Mercado Payment lo necesita' },
       { status: 400 },
     );
   }
 
   const origen = new URL(req.url).origin;
-  const pre = await crearSuscripcion({
+  const pre = await createSubscription({
     tenantId: tenant.id,
     nombreComercio: tenant.name,
     emailPagador: email,

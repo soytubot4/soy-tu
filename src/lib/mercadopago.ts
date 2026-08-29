@@ -1,5 +1,5 @@
 /**
- * Suscripciones de Mercado Pago (preapproval).
+ * Suscripciones de Mercado Payment (preapproval).
  *
  * Se usa preapproval y no Checkout Pro porque es lo único que cobra todos los
  * meses solo, con reintentos automáticos si a un comercio le rebota la tarjeta.
@@ -16,7 +16,7 @@ function token(): string {
 }
 
 /** Si estamos con credenciales de prueba. Sirve para avisarlo en el panel. */
-export const esPrueba = () => (process.env.MP_ACCESS_TOKEN ?? '').startsWith('TEST-');
+export const isSandbox = () => (process.env.MP_ACCESS_TOKEN ?? '').startsWith('TEST-');
 
 async function mp<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
@@ -31,7 +31,7 @@ async function mp<T>(path: string, init?: RequestInit): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(
-      `Mercado Pago ${res.status}: ${(data as { message?: string }).message ?? 'error'}`,
+      `Mercado Payment ${res.status}: ${(data as { message?: string }).message ?? 'error'}`,
     );
   }
   return data as T;
@@ -53,7 +53,7 @@ export type Preapproval = {
  * cruzar un webhook con un cliente nuestro. Sin eso llega un pago y no se sabe
  * de quién es.
  */
-export function crearSuscripcion(params: {
+export function createSubscription(params: {
   tenantId: string;
   nombreComercio: string;
   emailPagador: string;
@@ -78,9 +78,9 @@ export function crearSuscripcion(params: {
   });
 }
 
-export const traerSuscripcion = (id: string) => mp<Preapproval>(`/preapproval/${id}`);
+export const getSubscription = (id: string) => mp<Preapproval>(`/preapproval/${id}`);
 
-export type Pago = {
+export type Payment = {
   id: number;
   status: string;
   transaction_amount?: number;
@@ -90,4 +90,4 @@ export type Pago = {
   metadata?: { preapproval_id?: string };
 };
 
-export const traerPago = (id: string) => mp<Pago>(`/v1/payments/${id}`);
+export const getPayment = (id: string) => mp<Payment>(`/v1/payments/${id}`);

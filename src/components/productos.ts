@@ -20,7 +20,7 @@ export type Producto = {
   inicial: string;
 };
 
-export const PRODUCTOS: Producto[] = [
+export const PRODUCTS: Producto[] = [
   {
     slug: "soytuadmin",
     nombre: "soytuadmin",
@@ -33,7 +33,7 @@ export const PRODUCTOS: Producto[] = [
       "Ventas, compras y proveedores",
       "Facturación electrónica AFIP",
       "Caja diaria por sucursal",
-      "Mercado Libre, Mercado Pago y Tienda Nube",
+      "Mercado Libre, Mercado Payment y Tienda Nube",
     ],
     paraQuien: "Para comercios, distribuidoras y mayoristas.",
     sitio: "https://soytuadmin.com",

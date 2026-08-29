@@ -16,14 +16,14 @@ export async function requireSuperAdmin() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect('/entrar');
+  if (!user) redirect('/login');
 
   const admin = await prisma.adminUser.findUnique({
     where: { supabaseUserId: user.id },
     select: { type: true, active: true, fullName: true, email: true },
   });
 
-  if (!admin?.active || admin.type !== 'SUPERADMIN') redirect('/entrar?sin-acceso=1');
+  if (!admin?.active || admin.type !== 'SUPERADMIN') redirect('/login?sin-acceso=1');
 
   return admin;
 }

@@ -1,5 +1,5 @@
 /** Los cinco productos, con el nombre que usa `tenants.enabled_products`. */
-export const PRODUCTOS = [
+export const PRODUCTS = [
   { key: 'soytuadmin', nombre: 'Gestión', sitio: 'https://soytuadmin.com' },
   { key: 'soytubar', nombre: 'Bar', sitio: 'https://soytubar.com' },
   { key: 'soytucanje', nombre: 'Fidelidad', sitio: 'https://soytucanje.com' },
@@ -7,4 +7,4 @@ export const PRODUCTOS = [
   { key: 'soytucine', nombre: 'Contenido', sitio: 'https://soytucine.com' },
 ] as const;
 
-export type ProductoKey = (typeof PRODUCTOS)[number]['key'];
+export type ProductKey = (typeof PRODUCTS)[number]['key'];

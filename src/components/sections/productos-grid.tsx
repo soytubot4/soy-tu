@@ -1,4 +1,4 @@
-import { PRODUCTOS } from "@/components/productos";
+import { PRODUCTS } from "@/components/productos";
 
 /**
  * Las tarjetas son links: cada producto tiene su propio sitio y ahí están los
@@ -24,7 +24,7 @@ export function ProductosGrid() {
       </p>
 
       <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {PRODUCTOS.map((p) => (
+        {PRODUCTS.map((p) => (
           <a
             key={p.slug}
             href={p.sitio}

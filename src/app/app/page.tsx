@@ -1,8 +1,10 @@
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { PRODUCTOS } from '@/lib/productos';
-import { AL_NO_PAGAR, estadoDe, type EstadoPago } from '@/lib/suscripciones';
-import { esPrueba } from '@/lib/mercadopago';
+import { PRODUCTS } from '@/lib/products';
+import { LogoutButton } from './logout-button';
+import { EditableRow } from './tenant-row';
+import { ON_UNPAID, statusOf, type PaymentState } from '@/lib/subscriptions';
+import { isSandbox } from '@/lib/mercadopago';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,12 +33,12 @@ export default async function Panel() {
     include: { subscription: { select: { status: true, paidUntil: true, amount: true } } },
   });
 
-  const porProducto = PRODUCTOS.map((p) => ({
+  const porProducto = PRODUCTS.map((p) => ({
     ...p,
     total: tenants.filter((t) => t.enabledProducts.includes(p.key) && t.active).length,
   }));
   const activos = tenants.filter((t) => t.active).length;
-  const vencidos = tenants.filter((t) => estadoDe(t.subscription) === 'vencido').length;
+  const vencidos = tenants.filter((t) => statusOf(t.subscription) === 'vencido').length;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
@@ -45,16 +47,18 @@ export default async function Panel() {
         <p className="mt-2 text-muted">
           {activos} activos de {tenants.length} en total, en los cinco productos.
         </p>
-        <p className="mt-1 text-[13px] text-muted">{admin.fullName ?? admin.email}</p>
+        <p className="mt-1 text-[13px] text-muted">
+          {admin.fullName ?? admin.email} · <LogoutButton />
+        </p>
         {vencidos > 0 && (
           <p className="mt-3 text-[13px] text-amber-500">
             {vencidos} {vencidos === 1 ? 'comercio vencido' : 'comercios vencidos'}
-            {AL_NO_PAGAR === 'avisar' && ' · siguen funcionando: hoy solo se avisa'}
+            {ON_UNPAID === 'avisar' && ' · siguen funcionando: hoy solo se avisa'}
           </p>
         )}
-        {esPrueba() && (
+        {isSandbox() && (
           <p className="mt-1 text-[13px] text-amber-500">
-            Mercado Pago está en modo prueba: los cobros no son reales.
+            Mercado Payment está en modo prueba: los cobros no son reales.
           </p>
         )}
       </header>
@@ -76,14 +80,15 @@ export default async function Panel() {
             <tr className="border-b border-line text-left text-[13px] text-muted">
               <th className="px-4 py-3 font-medium">Comercio</th>
               <th className="px-4 py-3 font-medium">Productos</th>
-              <th className="px-4 py-3 font-medium">Pago</th>
+              <th className="px-4 py-3 font-medium">Payment</th>
               <th className="px-4 py-3 font-medium">Dueño</th>
               <th className="px-4 py-3 font-medium">Alta</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {tenants.map((t) => (
-              <tr key={t.id} className={`border-b border-line last:border-0 ${t.active ? '' : 'opacity-45'}`}>
+              <EditableRow key={t.id} t={t}>
                 <td className="px-4 py-3">
                   <span className="block font-medium">{t.name}</span>
                   <span className="text-[13px] text-muted">
@@ -93,7 +98,7 @@ export default async function Panel() {
                 </td>
                 <td className="px-4 py-3">
                   <span className="flex flex-wrap gap-1">
-                    {PRODUCTOS.filter((p) => t.enabledProducts.includes(p.key)).map((p) => (
+                    {PRODUCTS.filter((p) => t.enabledProducts.includes(p.key)).map((p) => (
                       <span
                         key={p.key}
                         className="rounded-full border border-line-strong px-2 py-0.5 text-[11px]"
@@ -105,11 +110,11 @@ export default async function Panel() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <EstadoDePago estado={estadoDe(t.subscription)} hasta={t.subscription?.paidUntil ?? null} />
+                  <PaymentStatus estado={statusOf(t.subscription)} hasta={t.subscription?.paidUntil ?? null} />
                 </td>
                 <td className="px-4 py-3 text-muted">{t.ownerEmail ?? t.email ?? '—'}</td>
                 <td className="px-4 py-3 tabular-nums text-muted">{fecha(t.createdAt)}</td>
-              </tr>
+              </EditableRow>
             ))}
           </tbody>
         </table>
@@ -118,7 +123,7 @@ export default async function Panel() {
   );
 }
 
-const ESTADOS: Record<EstadoPago, { texto: string; clase: string }> = {
+const STATUS_LABELS: Record<PaymentState, { texto: string; clase: string }> = {
   'al-dia': { texto: 'Al día', clase: 'text-emerald-500' },
   'por-vencer': { texto: 'Por vencer', clase: 'text-amber-500' },
   prueba: { texto: 'En prueba', clase: 'text-muted' },
@@ -127,8 +132,8 @@ const ESTADOS: Record<EstadoPago, { texto: string; clase: string }> = {
 };
 
 /** El estado de pago, con la fecha cuando la hay: "vencido" sin fecha no sirve. */
-function EstadoDePago({ estado, hasta }: { estado: EstadoPago; hasta: Date | null }) {
-  const e = ESTADOS[estado];
+function PaymentStatus({ estado, hasta }: { estado: PaymentState; hasta: Date | null }) {
+  const e = STATUS_LABELS[estado];
   return (
     <span>
       <span className={`block text-[13px] font-medium ${e.clase}`}>{e.texto}</span>
