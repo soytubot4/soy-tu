@@ -55,12 +55,14 @@ export default async function Products() {
               plans: p.plans.map((pl) => ({
                 id: pl.id,
                 name: pl.name,
+                description: pl.description,
                 features: pl.features,
                 active: pl.active,
                 periods: pl.periods.map((pe) => ({
                   id: pe.id,
                   period: pe.period,
                   price: Number(pe.price),
+                  currency: pe.currency,
                   label: PERIODS.find((x) => x.key === pe.period)?.label ?? pe.period,
                   precio: money(Number(pe.price), pe.currency),
                   porMes: money(perMonth(Number(pe.price), pe.period), pe.currency),

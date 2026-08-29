@@ -6,7 +6,12 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   await requireSuperAdmin();
-  const b = (await req.json()) as { productId?: string; name?: string; features?: string[] };
+  const b = (await req.json()) as {
+    productId?: string;
+    name?: string;
+    description?: string;
+    features?: string[];
+  };
   if (!b.productId || !b.name) {
     return NextResponse.json({ ok: false, error: 'Falta el producto o el nombre' }, { status: 400 });
   }
@@ -14,6 +19,7 @@ export async function POST(req: Request) {
     data: {
       productId: b.productId,
       name: b.name.trim(),
+      description: b.description?.trim() || null,
       features: (b.features ?? []).map((f) => f.trim()).filter(Boolean),
     },
   });
@@ -22,12 +28,19 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   await requireSuperAdmin();
-  const b = (await req.json()) as { id?: string; name?: string; features?: string[]; active?: boolean };
+  const b = (await req.json()) as {
+    id?: string;
+    name?: string;
+    description?: string;
+    features?: string[];
+    active?: boolean;
+  };
   if (!b.id) return NextResponse.json({ ok: false, error: 'Falta el plan' }, { status: 400 });
   const plan = await prisma.billingPlan.update({
     where: { id: b.id },
     data: {
       ...(b.name !== undefined ? { name: b.name.trim() } : {}),
+      ...(b.description !== undefined ? { description: b.description.trim() || null } : {}),
       ...(b.features !== undefined ? { features: b.features.map((f) => f.trim()).filter(Boolean) } : {}),
       ...(b.active !== undefined ? { active: b.active } : {}),
     },
