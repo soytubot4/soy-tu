@@ -62,6 +62,8 @@ model Subscription {
   paidUntil       DateTime? @map("paid_until")
   amount          Decimal?  @db.Decimal(14, 2)
   currency        String    @default("ARS")
+  billingPeriodId String?   @map("billing_period_id") @db.Uuid
+  billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id])
   mpPreapprovalId String?   @unique @map("mp_preapproval_id")
   mpPayerEmail    String?   @map("mp_payer_email")
   lastEvent       Json?     @map("last_event")
@@ -90,4 +92,59 @@ model SubscriptionPayment {
 
   @@index([tenantId, createdAt])
   @@map("subscription_payments")
+}
+
+/// Qué se vende. Ver `sql/02-productos-y-planes.sql`.
+model BillingProduct {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Coincide con lo que guarda `tenants.enabled_products`.
+  key         String   @unique
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  plans BillingPlan[]
+
+  @@map("billing_products")
+}
+
+/// Cuánto trae. Un producto tiene varios planes segun las features.
+model BillingPlan {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  name        String
+  description String?
+  features    String[] @default([])
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  product BillingProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  periods BillingPeriod[]
+
+  @@unique([productId, name])
+  @@map("billing_plans")
+}
+
+/// Cada cuanto y a cuanto. El precio vive aca porque cambia con la frecuencia.
+model BillingPeriod {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  /// 'MENSUAL' | 'TRIMESTRAL' | 'SEMESTRAL' | 'ANUAL'
+  period    String
+  price     Decimal  @db.Decimal(14, 2)
+  currency  String   @default("ARS")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  plan          BillingPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+
+  @@unique([planId, period])
+  @@map("billing_periods")
 }

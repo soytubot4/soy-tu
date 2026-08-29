@@ -43,6 +43,12 @@ export default async function Panel() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-12">
       <header className="mb-10">
+        <nav className="mb-6 flex gap-4 text-sm">
+          <span className="font-medium">Comercios</span>
+          <a href="/products" className="text-muted transition-colors hover:text-fg">
+            Productos y precios
+          </a>
+        </nav>
         <h1 className="text-3xl font-semibold tracking-tight">Comercios</h1>
         <p className="mt-2 text-muted">
           {activos} activos de {tenants.length} en total, en los cinco productos.
