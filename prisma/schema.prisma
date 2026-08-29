@@ -27,6 +27,7 @@ model Tenant {
   createdAt       DateTime @default(now()) @map("created_at")
 
   subscriptions Subscription[]
+  agreements    BillingAgreement[]
   payments      SubscriptionPayment[]
   logs          SubscriptionLog[]
 
@@ -72,17 +73,17 @@ model Subscription {
   trialEndsAt     DateTime?      @map("trial_ends_at")
   cancelledAt     DateTime?      @map("cancelled_at")
   notes           String?
-  mpPreapprovalId String?        @unique @map("mp_preapproval_id")
-  mpPayerEmail    String?        @map("mp_payer_email")
+  agreementId     String?        @map("agreement_id") @db.Uuid
   lastEvent       Json?          @map("last_event")
   lastEventAt     DateTime?      @map("last_event_at")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
-  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product  BillingProduct?       @relation(fields: [productId], references: [id])
-  payments SubscriptionPayment[]
-  logs     SubscriptionLog[]
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   BillingProduct?       @relation(fields: [productId], references: [id])
+  agreement BillingAgreement?     @relation(fields: [agreementId], references: [id])
+  payments  SubscriptionPayment[]
+  logs      SubscriptionLog[]
 
   @@unique([tenantId, productId])
   @@map("subscriptions")
@@ -104,9 +105,11 @@ model SubscriptionPayment {
   raw            Json?
   createdAt      DateTime  @default(now()) @map("created_at")
   subscriptionId String?   @map("subscription_id") @db.Uuid
+  agreementId    String?   @map("agreement_id") @db.Uuid
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription?     @relation(fields: [subscriptionId], references: [id])
+  agreement    BillingAgreement? @relation(fields: [agreementId], references: [id])
 
   @@index([tenantId, createdAt])
   @@index([subscriptionId, createdAt])
@@ -127,10 +130,12 @@ model SubscriptionLog {
   data           Json?
   /// Quién lo hizo. NULL = lo hizo Mercado Pago, no una persona.
   actorEmail     String?  @map("actor_email")
+  agreementId    String?  @map("agreement_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  agreement    BillingAgreement? @relation(fields: [agreementId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
   @@map("subscription_logs")
@@ -190,4 +195,39 @@ model BillingPeriod {
 
   @@unique([planId, period])
   @@map("billing_periods")
+}
+
+/// Cómo se le cobra a un comercio: un débito que puede cubrir varios productos.
+///
+/// La suscripción dice QUÉ tiene contratado y a cuánto; el acuerdo dice CÓMO se
+/// paga. Separadas porque un comercio con tres productos tiene tres suscripciones
+/// pero un solo débito por mes.
+model BillingAgreement {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  /// 'PRUEBA' | 'pending' | 'authorized' | 'paused' | 'cancelled'
+  status          String    @default("pending")
+  /// Lo que se debita, siempre en pesos: es lo que entiende Mercado Pago.
+  amount          Decimal?  @db.Decimal(14, 2)
+  /// Cada cuántos meses. Un preapproval tiene una sola frecuencia, así que todas
+  /// las suscripciones del acuerdo comparten la suya.
+  months          Int       @default(1)
+  fxRate          Decimal?  @map("fx_rate") @db.Decimal(14, 2)
+  paidUntil       DateTime? @map("paid_until")
+  mpPreapprovalId String?   @unique @map("mp_preapproval_id")
+  mpPayerEmail    String?   @map("mp_payer_email")
+  lastEvent       Json?     @map("last_event")
+  lastEventAt     DateTime? @map("last_event_at")
+  startedAt       DateTime? @map("started_at")
+  cancelledAt     DateTime? @map("cancelled_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  payments      SubscriptionPayment[]
+  logs          SubscriptionLog[]
+
+  @@index([tenantId])
+  @@map("billing_agreements")
 }

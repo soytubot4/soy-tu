@@ -2,47 +2,73 @@ import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createSubscription } from '@/lib/mercadopago';
-import { monthsOf, officialRate, toPesos } from '@/lib/billing';
+import { money, monthsOf, officialRate, toPesos } from '@/lib/billing';
 import { log } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Contrata un producto para un comercio y devuelve el link de pago.
+ * Contrata uno o varios productos y devuelve UN link de pago para todos.
  *
- * Es por producto: un comercio con soytuadmin y soytuturno tiene dos
- * suscripciones, cada una con su plan, su precio y su link.
+ * Un comercio con soytuadmin, soytucanje y soytuturno tiene tres suscripciones
+ * —cada una con su plan y su precio— pero un solo débito por mes. Tres débitos
+ * serían tres renglones en el resumen, tres cosas que pueden rebotar y tres
+ * llamados cuando una rebota.
  *
- * La suscripción se guarda ANTES de pedirle el link a Mercado Pago, porque su
- * `external_reference` tiene que ser el id de la nuestra: es lo único que
- * después permite saber cuál de los dos productos pagó el comercio.
+ * Lo que agrupa es el acuerdo de cobro: se crea primero, porque el
+ * `external_reference` del preapproval tiene que ser su id. Es lo único que
+ * después permite saber qué cubrió un pago.
  */
 export async function POST(req: Request) {
   const admin = await requireSuperAdmin();
 
-  const { tenantId, billingPeriodId } = (await req.json()) as {
-    tenantId?: string;
-    billingPeriodId?: string;
-  };
-  if (!tenantId || !billingPeriodId) {
-    return NextResponse.json({ ok: false, error: 'Falta el comercio o el plan' }, { status: 400 });
+  const body = (await req.json()) as { tenantId?: string; billingPeriodIds?: string[] };
+  const { tenantId } = body;
+  const ids = [...new Set(body.billingPeriodIds ?? [])];
+
+  if (!tenantId || !ids.length) {
+    return NextResponse.json({ ok: false, error: 'Falta el comercio o los planes' }, { status: 400 });
   }
 
-  const [tenant, periodo] = await Promise.all([
+  const [tenant, periodos] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { id: true, name: true, ownerEmail: true, email: true },
     }),
-    prisma.billingPeriod.findUnique({
-      where: { id: billingPeriodId },
+    prisma.billingPeriod.findMany({
+      where: { id: { in: ids } },
       include: { plan: { include: { product: true } } },
     }),
   ]);
+
   if (!tenant) {
     return NextResponse.json({ ok: false, error: 'Comercio no encontrado' }, { status: 404 });
   }
-  if (!periodo) {
-    return NextResponse.json({ ok: false, error: 'Plan no encontrado' }, { status: 404 });
+  if (periodos.length !== ids.length) {
+    return NextResponse.json({ ok: false, error: 'Alguno de los planes no existe' }, { status: 404 });
+  }
+
+  // Un producto no se puede contratar dos veces en el mismo cobro: si no, no se
+  // sabría cuál de los dos planes es el que tiene.
+  const productos = periodos.map((p) => p.plan.productId);
+  if (new Set(productos).size !== productos.length) {
+    return NextResponse.json(
+      { ok: false, error: 'Elegiste dos planes del mismo producto' },
+      { status: 400 },
+    );
+  }
+
+  // Mercado Pago cobra con UNA frecuencia por débito. Mezclar un mensual con un
+  // anual en el mismo cobro le cobraría el año doce veces.
+  const meses = [...new Set(periodos.map((p) => monthsOf(p.period)))];
+  if (meses.length > 1) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Los planes tienen frecuencias distintas. Para cobrarlos juntos tienen que ser todos de la misma.',
+      },
+      { status: 400 },
+    );
   }
 
   const email = tenant.ownerEmail ?? tenant.email;
@@ -53,13 +79,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // El precio se cotiza en dólares pero se cobra en pesos. La cotización se
-  // busca ahora y se guarda con el cobro: sin eso no se puede explicar por qué a
-  // dos comercios el mismo plan les salió distinto.
-  const precio = Number(periodo.price);
+  // El precio se cotiza en dólares pero se cobra en pesos. La cotización se pide
+  // una sola vez para todo el cobro: con dos llamadas podrían venir dos dólares
+  // distintos y la suma no daría.
   let cotizacion: number | null = null;
-  let enPesos = precio;
-  if (periodo.currency === 'USD') {
+  if (periodos.some((p) => p.currency === 'USD')) {
     try {
       cotizacion = await officialRate();
     } catch {
@@ -68,59 +92,79 @@ export async function POST(req: Request) {
         { status: 502 },
       );
     }
-    enPesos = toPesos(precio, periodo.currency, cotizacion);
   }
 
-  const producto = periodo.plan.product;
-  const detalle = `${producto.name} ${periodo.plan.name}`;
+  const enPesos = periodos.reduce(
+    (s, p) => s + toPesos(Number(p.price), p.currency, cotizacion ?? 1),
+    0,
+  );
 
-  // Se crea (o se reusa) la fila antes de pedir el link, para tener su id.
-  const sub = await prisma.subscription.upsert({
-    where: { tenantId_productId: { tenantId: tenant.id, productId: producto.id } },
-    create: {
-      tenantId: tenant.id,
-      productId: producto.id,
-      billingPeriodId: periodo.id,
-      status: 'pending',
-      amount: precio,
-      currency: periodo.currency,
-      startedAt: new Date(),
-    },
-    update: { billingPeriodId: periodo.id, amount: precio, currency: periodo.currency },
+  const detalle = periodos.map((p) => `${p.plan.product.name} ${p.plan.name}`).join(' + ');
+
+  // Todo junto: si algo falla, el comercio no queda con suscripciones a medias
+  // apuntando a un acuerdo que no existe.
+  const acuerdo = await prisma.$transaction(async (tx) => {
+    const a = await tx.billingAgreement.create({
+      data: {
+        tenantId: tenant.id,
+        status: 'pending',
+        amount: enPesos,
+        months: meses[0]!,
+        fxRate: cotizacion,
+        mpPayerEmail: email,
+        startedAt: new Date(),
+      },
+    });
+
+    for (const p of periodos) {
+      await tx.subscription.upsert({
+        where: { tenantId_productId: { tenantId: tenant.id, productId: p.plan.productId } },
+        create: {
+          tenantId: tenant.id,
+          productId: p.plan.productId,
+          billingPeriodId: p.id,
+          agreementId: a.id,
+          status: 'pending',
+          amount: p.price,
+          currency: p.currency,
+          startedAt: new Date(),
+        },
+        update: {
+          billingPeriodId: p.id,
+          agreementId: a.id,
+          amount: p.price,
+          currency: p.currency,
+        },
+      });
+    }
+    return a;
   });
 
-  const origen = new URL(req.url).origin;
   const pre = await createSubscription({
-    subscriptionId: sub.id,
+    subscriptionId: acuerdo.id,
     nombreComercio: tenant.name,
     detalle,
     emailPagador: email,
     monto: enPesos,
-    mesesPorCobro: monthsOf(periodo.period),
-    volverA: `${origen}/app`,
+    mesesPorCobro: meses[0]!,
+    volverA: `${new URL(req.url).origin}/app`,
   });
 
-  await prisma.subscription.update({
-    where: { id: sub.id },
+  await prisma.billingAgreement.update({
+    where: { id: acuerdo.id },
     data: { status: pre.status, mpPreapprovalId: pre.id, mpPayerEmail: pre.payer_email ?? email },
   });
 
   await log({
     tenantId: tenant.id,
-    subscriptionId: sub.id,
+    agreementId: acuerdo.id,
     kind: 'plan-cambiado',
-    description: `${detalle} · ${periodo.period.toLowerCase()} · ${periodo.currency} ${precio}${
-      cotizacion ? ` (a $${enPesos}, dólar ${cotizacion})` : ''
-    }`,
-    data: { periodId: periodo.id, precio, currency: periodo.currency, cotizacion, enPesos },
+    description: `${detalle} · ${money(enPesos)} cada ${
+      meses[0] === 1 ? 'mes' : `${meses[0]} meses`
+    }${cotizacion ? ` (dólar ${cotizacion})` : ''}`,
+    data: { periodIds: ids, enPesos, cotizacion, meses: meses[0] },
     actorEmail: admin.email,
   });
 
-  return NextResponse.json({
-    ok: true,
-    link: pre.init_point,
-    id: pre.id,
-    enPesos,
-    cotizacion,
-  });
+  return NextResponse.json({ ok: true, link: pre.init_point, id: pre.id, enPesos, cotizacion });
 }

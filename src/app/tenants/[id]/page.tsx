@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { money } from '@/lib/billing';
 import { PRODUCTS } from '@/lib/products';
 import { statusOf, worstStatus, type PaymentState } from '@/lib/subscriptions';
-import { Acciones, Nota } from './acciones';
+import { Contratar, Nota } from './acciones';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,9 +58,14 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
         include: {
           product: true,
           billingPeriod: { include: { plan: true } },
+          agreement: true,
         },
       },
-      payments: { orderBy: { createdAt: 'desc' }, take: 100, include: { subscription: { include: { product: true } } } },
+      payments: {
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: { subscription: { include: { product: true } } },
+      },
       logs: { orderBy: { createdAt: 'desc' }, take: 60 },
     },
   });
@@ -83,6 +88,44 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
     .filter((p) => p.status === 'approved')
     .reduce((s, p) => s + Number(p.amount ?? 0), 0);
   const estado = worstStatus(tenant.subscriptions);
+
+  /**
+   * Las suscripciones agrupadas por el débito que las paga.
+   *
+   * Las que todavía no tienen acuerdo (las que están en prueba) van cada una por
+   * su lado: no hay un débito que las junte.
+   */
+  const debitos = Object.values(
+    tenant.subscriptions.reduce<
+      Record<
+        string,
+        {
+          key: string;
+          status: string;
+          paidUntil: Date | null;
+          amount: number | null;
+          months: number;
+          fxRate: number | null;
+          mpPreapprovalId: string | null;
+          subs: typeof tenant.subscriptions;
+        }
+      >
+    >((acc, s) => {
+      const key = s.agreementId ?? `sola:${s.id}`;
+      acc[key] ??= {
+        key,
+        status: s.agreement?.status ?? s.status,
+        paidUntil: s.agreement?.paidUntil ?? s.paidUntil,
+        amount: s.agreement ? Number(s.agreement.amount) : s.amount ? Number(s.amount) : null,
+        months: s.agreement?.months ?? 1,
+        fxRate: s.agreement?.fxRate ? Number(s.agreement.fxRate) : null,
+        mpPreapprovalId: s.agreement?.mpPreapprovalId ?? null,
+        subs: [],
+      };
+      acc[key].subs.push(s);
+      return acc;
+    }, {}),
+  );
 
   // Productos que usa pero que no tiene contratados: es la plata que se está
   // dejando sobre la mesa, así que se muestra, no se esconde.
@@ -131,53 +174,53 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
 
         {!tenant.subscriptions.length && (
           <p className="rounded-xl border border-dashed border-line p-6 text-muted">
-            Todavía no contrató nada. Asignale un plan abajo.
+            Todavía no contrató nada. Armale el cobro abajo.
           </p>
         )}
 
+        {/* Agrupado por débito y no por producto: lo que se le cobra al comercio
+            es un renglón en su resumen, no tres. */}
         <div className="space-y-3">
-          {tenant.subscriptions.map((s) => {
-            const e = statusOf(s);
+          {debitos.map((d) => {
+            const e = statusOf(d);
             return (
-              <div key={s.id} className="rounded-xl border border-line p-5">
+              <div key={d.key} className="rounded-xl border border-line p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">
-                      {s.product?.name ?? 'Producto borrado'}
-                      {s.billingPeriod && (
-                        <span className="text-muted">
-                          {' · '}
-                          {s.billingPeriod.plan.name}
-                        </span>
-                      )}
+                      {d.amount != null ? money(Number(d.amount)) : 'Sin precio'}
+                      <span className="text-muted">
+                        {' '}
+                        cada {d.months === 1 ? 'mes' : `${d.months} meses`}
+                      </span>
                     </p>
-                    <p className="text-[13px] text-muted">
-                      {s.amount != null
-                        ? `${money(Number(s.amount), s.currency)}${
-                            s.billingPeriod ? ` por ${s.billingPeriod.period.toLowerCase()}` : ''
-                          }`
-                        : 'Sin precio asignado'}
-                      {s.mpPreapprovalId && ' · con débito automático'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-[13px] font-medium ${ESTADOS[e].clase}`}>
-                      {ESTADOS[e].texto}
-                    </p>
-                    {s.paidUntil && (
-                      <p className="text-[11px] tabular-nums text-muted">
-                        hasta {fecha(s.paidUntil)}
+                    <ul className="mt-1 text-[13px] text-muted">
+                      {d.subs.map((s) => (
+                        <li key={s.id}>
+                          {s.product?.name ?? 'Producto borrado'}
+                          {s.billingPeriod && ` · ${s.billingPeriod.plan.name}`}
+                          {s.amount != null && ` · ${money(Number(s.amount), s.currency)}`}
+                        </li>
+                      ))}
+                    </ul>
+                    {d.fxRate && (
+                      <p className="mt-1 text-[11px] text-muted">
+                        armado con el dólar a {Number(d.fxRate)}
                       </p>
                     )}
                   </div>
+                  <div className="shrink-0 text-right">
+                    <p className={`text-[13px] font-medium ${ESTADOS[e].clase}`}>{ESTADOS[e].texto}</p>
+                    {d.paidUntil && (
+                      <p className="text-[11px] tabular-nums text-muted">
+                        hasta {fecha(d.paidUntil)}
+                      </p>
+                    )}
+                    {d.mpPreapprovalId && (
+                      <p className="text-[11px] text-muted">débito automático</p>
+                    )}
+                  </div>
                 </div>
-                <Acciones
-                  tenantId={tenant.id}
-                  subscriptionId={s.id}
-                  productKey={s.product?.key ?? null}
-                  actual={s.billingPeriodId}
-                  catalogo={catalogo.map(plano)}
-                />
               </div>
             );
           })}
@@ -191,8 +234,18 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
         )}
 
         <div className="mt-4 rounded-xl border border-line p-5">
-          <p className="mb-3 text-[13px] font-medium">Contratar otro producto</p>
-          <Acciones tenantId={tenant.id} catalogo={catalogo.map(plano)} />
+          <p className="mb-3 text-[13px] font-medium">
+            {tenant.subscriptions.length ? 'Cambiar el cobro' : 'Armar el cobro'}
+          </p>
+          <Contratar
+            tenantId={tenant.id}
+            catalogo={catalogo.map(plano)}
+            actuales={Object.fromEntries(
+              tenant.subscriptions
+                .filter((s) => s.product && s.billingPeriodId)
+                .map((s) => [s.product!.key, s.billingPeriodId!]),
+            )}
+          />
         </div>
       </section>
 
@@ -209,7 +262,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
               <thead>
                 <tr className="border-b border-line text-left text-[13px] text-muted">
                   <th className="px-4 py-3 font-medium">Fecha</th>
-                  <th className="px-4 py-3 font-medium">Producto</th>
+                  <th className="px-4 py-3 font-medium">Qué cubrió</th>
                   <th className="px-4 py-3 font-medium">Monto</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
                   <th className="px-4 py-3 font-medium">Mercado Pago</th>
@@ -223,7 +276,9 @@ export default async function TenantDetail({ params }: { params: Promise<{ id: s
                       <td className="px-4 py-3 tabular-nums text-muted">
                         {fecha(p.paidAt ?? p.createdAt)}
                       </td>
-                      <td className="px-4 py-3">{p.subscription?.product?.name ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {p.description || p.subscription?.product?.name || '—'}
+                      </td>
                       <td className="px-4 py-3 font-medium tabular-nums">
                         {money(Number(p.amount ?? 0), p.currency)}
                         {p.fxRate && (

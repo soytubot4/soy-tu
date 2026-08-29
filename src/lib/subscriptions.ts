@@ -76,6 +76,7 @@ export function worstStatus(subs: { status: string; paidUntil: Date | null }[]):
 export function log(params: {
   tenantId: string;
   subscriptionId?: string | null;
+  agreementId?: string | null;
   kind: string;
   description: string;
   data?: object;
@@ -85,6 +86,7 @@ export function log(params: {
     data: {
       tenantId: params.tenantId,
       subscriptionId: params.subscriptionId ?? null,
+      agreementId: params.agreementId ?? null,
       kind: params.kind,
       description: params.description,
       data: (params.data ?? undefined) as never,
@@ -132,117 +134,148 @@ export async function startTrial(tenantId: string, productId: string, actorEmail
 export async function processNotification(tipo: string, id: string) {
   if (tipo === 'subscription_preapproval' || tipo === 'preapproval') {
     const pre = await getSubscription(id);
-    // `external_reference` es el id de NUESTRA suscripcion: identifica comercio
-    // y producto juntos.
-    const sub = await buscar(pre.external_reference, pre.id);
-    if (!sub) return { ok: false, motivo: 'no se pudo cruzar con una suscripcion' };
+    // `external_reference` es el id del acuerdo de cobro: identifica al comercio
+    // y a todos los productos que ese débito cubre.
+    const acuerdo = await buscar(pre.external_reference, pre.id);
+    if (!acuerdo) return { ok: false, motivo: 'no se pudo cruzar con un acuerdo' };
 
     // Un mes más desde ahora. Mercado Payment no dice hasta cuándo pagó, así que la
     // fecha se lleva de este lado.
     const hasta =
-      pre.status === 'authorized' ? new Date(Date.now() + 31 * 86_400_000) : undefined;
+      pre.status === 'authorized'
+        ? new Date(Date.now() + acuerdo.months * 31 * 86_400_000)
+        : undefined;
 
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: {
-        status: pre.status,
-        mpPreapprovalId: pre.id,
-        mpPayerEmail: pre.payer_email,
-        ...(hasta ? { paidUntil: hasta } : {}),
-        ...(pre.status === 'cancelled' ? { cancelledAt: new Date() } : {}),
-        lastEvent: pre as object,
-        lastEventAt: new Date(),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.billingAgreement.update({
+        where: { id: acuerdo.id },
+        data: {
+          status: pre.status,
+          mpPayerEmail: pre.payer_email,
+          ...(hasta ? { paidUntil: hasta } : {}),
+          ...(pre.status === 'cancelled' ? { cancelledAt: new Date() } : {}),
+          lastEvent: pre as object,
+          lastEventAt: new Date(),
+        },
+      });
+      // El estado lo dicta el acuerdo: todo lo que cubre ese débito se paga o no
+      // se paga junto.
+      await tx.subscription.updateMany({
+        where: { agreementId: acuerdo.id },
+        data: {
+          status: pre.status,
+          ...(hasta ? { paidUntil: hasta } : {}),
+          ...(pre.status === 'cancelled' ? { cancelledAt: new Date() } : {}),
+        },
+      });
     });
 
     // Solo se anota cuando cambia: Mercado Pago reenvia el mismo aviso varias
     // veces y el historial quedaria lleno de renglones identicos.
-    if (pre.status !== sub.status) {
+    if (pre.status !== acuerdo.status) {
       await log({
-        tenantId: sub.tenantId,
-        subscriptionId: sub.id,
-        kind: pre.status === 'cancelled' ? 'cancelada' : pre.status === 'paused' ? 'pausada' : 'creada',
-        description: `Mercado Pago la paso a "${pre.status}"`,
-        data: { antes: sub.status, ahora: pre.status },
+        tenantId: acuerdo.tenantId,
+        agreementId: acuerdo.id,
+        kind:
+          pre.status === 'cancelled' ? 'cancelada' : pre.status === 'paused' ? 'pausada' : 'creada',
+        description: `Mercado Pago pasó el débito a "${pre.status}"`,
+        data: { antes: acuerdo.status, ahora: pre.status },
       });
     }
-    return { ok: true, tenantId: sub.tenantId, status: pre.status };
+    return { ok: true, tenantId: acuerdo.tenantId, status: pre.status };
   }
 
   if (tipo === 'payment') {
     const pago = await getPayment(id);
-    const sub = await buscar(pago.external_reference, pago.metadata?.preapproval_id);
-    if (!sub) return { ok: false, motivo: 'no se pudo cruzar con una suscripcion' };
+    const acuerdo = await buscar(pago.external_reference, pago.metadata?.preapproval_id);
+    if (!acuerdo) return { ok: false, motivo: 'no se pudo cruzar con un acuerdo' };
 
-    // Si ya estaba registrado no se vuelve a anotar en el historial: Mercado Pago
-    // reenvia el mismo aviso y contariamos el cobro dos veces.
+    // Si ya estaba registrado no se vuelve a anotar: Mercado Pago reenvia el
+    // mismo aviso y el cobro se contaria dos veces.
     const yaEstaba = await prisma.subscriptionPayment.findUnique({
       where: { mpPaymentId: String(pago.id) },
       select: { id: true, status: true },
     });
 
+    const datos = {
+      tenantId: acuerdo.tenantId,
+      agreementId: acuerdo.id,
+      status: pago.status,
+      amount: pago.transaction_amount,
+      currency: pago.currency_id ?? 'ARS',
+      paidAt: pago.date_approved ? new Date(pago.date_approved) : null,
+      fxRate: acuerdo.fxRate,
+      description: acuerdo.subscriptions
+        .map((s) => s.product?.name)
+        .filter(Boolean)
+        .join(' + '),
+      raw: pago as object,
+    };
+
     // upsert por el id de Mercado Payment: el mismo aviso puede llegar dos veces y
     // no se puede contar el cobro dos veces.
     await prisma.subscriptionPayment.upsert({
       where: { mpPaymentId: String(pago.id) },
-      create: {
-        tenantId: sub.tenantId,
-        subscriptionId: sub.id,
-        mpPaymentId: String(pago.id),
-        status: pago.status,
-        amount: pago.transaction_amount,
-        currency: pago.currency_id ?? 'ARS',
-        paidAt: pago.date_approved ? new Date(pago.date_approved) : null,
-        raw: pago as object,
-      },
-      update: {
-        status: pago.status,
-        subscriptionId: sub.id,
-        paidAt: pago.date_approved ? new Date(pago.date_approved) : null,
-        raw: pago as object,
-      },
+      create: { ...datos, mpPaymentId: String(pago.id) },
+      update: datos,
     });
 
     if (pago.status === 'approved') {
-      await prisma.subscription.update({
-        where: { id: sub.id },
-        data: { paidUntil: new Date(Date.now() + 31 * 86_400_000), status: 'authorized' },
-      });
+      const hasta = new Date(Date.now() + acuerdo.months * 31 * 86_400_000);
+      await prisma.$transaction([
+        prisma.billingAgreement.update({
+          where: { id: acuerdo.id },
+          data: { paidUntil: hasta, status: 'authorized' },
+        }),
+        prisma.subscription.updateMany({
+          where: { agreementId: acuerdo.id },
+          data: { paidUntil: hasta, status: 'authorized' },
+        }),
+      ]);
     }
 
     if (yaEstaba?.status !== pago.status) {
       await log({
-        tenantId: sub.tenantId,
-        subscriptionId: sub.id,
+        tenantId: acuerdo.tenantId,
+        agreementId: acuerdo.id,
         kind: pago.status === 'approved' ? 'pago' : 'pago-rechazado',
         description:
           pago.status === 'approved'
-            ? `Cobro aprobado por $${pago.transaction_amount}`
+            ? `Cobro aprobado por $${pago.transaction_amount}${datos.description ? ` · ${datos.description}` : ''}`
             : `Cobro ${pago.status} por $${pago.transaction_amount}`,
         data: { mpPaymentId: String(pago.id), status: pago.status },
       });
     }
-    return { ok: true, tenantId: sub.tenantId, status: pago.status };
+    return { ok: true, tenantId: acuerdo.tenantId, status: pago.status };
   }
 
   return { ok: false, motivo: `tipo no manejado: ${tipo}` };
 }
 
 /**
- * Encuentra la suscripcion de un aviso.
+ * Encuentra el acuerdo de cobro de un aviso.
  *
  * Primero por `external_reference`, que es lo que mandamos nosotros. Si no vino
  * (los avisos de pago sueltos a veces no lo traen) se cae al id de preapproval,
  * que quedo guardado al contratar.
  */
 async function buscar(externalRef?: string, preapprovalId?: string) {
-  const campos = { id: true, tenantId: true, status: true } as const;
+  const incluir = {
+    subscriptions: { include: { product: { select: { name: true } } } },
+  } as const;
+
   if (externalRef) {
-    const s = await prisma.subscription.findUnique({ where: { id: externalRef }, select: campos });
-    if (s) return s;
+    const a = await prisma.billingAgreement.findUnique({
+      where: { id: externalRef },
+      include: incluir,
+    });
+    if (a) return a;
   }
   if (preapprovalId) {
-    return prisma.subscription.findUnique({ where: { mpPreapprovalId: preapprovalId }, select: campos });
+    return prisma.billingAgreement.findUnique({
+      where: { mpPreapprovalId: preapprovalId },
+      include: incluir,
+    });
   }
   return null;
 }
