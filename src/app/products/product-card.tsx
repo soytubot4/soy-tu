@@ -198,7 +198,7 @@ function PlanBlock({
   plan: Plan;
   onRun: (fn: () => Promise<unknown>) => Promise<void>;
 }) {
-  const [periodo, setPeriodo] = useState<string>('MENSUAL');
+  const [periodo, setPeriodo] = useState<string>('');
   const [precio, setPrecio] = useState('');
   // Arranca en USD porque es como se cotiza; el cobro se convierte a pesos al
   // oficial del día, así el precio no se atrasa solo.
@@ -209,6 +209,17 @@ function PlanBlock({
   const [features, setFeatures] = useState(aLineas(plan.features));
 
   const faltantes = PERIODS.filter((p) => !plan.periods.some((x) => x.period === p.key));
+
+  /**
+   * La frecuencia elegida, siempre una de las que quedan libres.
+   *
+   * El estado solo no alcanza: cuando se carga una frecuencia, esa desaparece de
+   * la lista pero el estado se queda con ella. El navegador entonces muestra la
+   * primera opción y React sigue mandando la vieja — le dabas a "Poner precio"
+   * creyendo que agregabas Trimestral y le pisaba el precio al Mensual.
+   */
+  const elegido = faltantes.some((p) => p.key === periodo) ? periodo : (faltantes[0]?.key ?? '');
+
   const cambiado =
     nombre !== plan.name ||
     desc !== (plan.description ?? '') ||
@@ -326,9 +337,10 @@ function PlanBlock({
       {!!faltantes.length && (
         <div className="mt-3 flex flex-wrap gap-2">
           <select
-            value={periodo}
+            value={elegido}
             onChange={(e) => setPeriodo(e.target.value)}
             className={`${input} w-36`}
+            aria-label="Frecuencia"
           >
             {faltantes.map((p) => (
               <option key={p.key} value={p.key}>
@@ -357,14 +369,14 @@ function PlanBlock({
           />
           <button
             type="button"
-            disabled={!precio.trim()}
+            disabled={!precio.trim() || !elegido}
             onClick={() =>
               onRun(async () => {
                 const n = parsePrice(precio);
                 if (n === null) throw new Error(`"${precio}" no es un precio válido`);
                 await post('/api/billing/periods', {
                   planId: plan.id,
-                  period: periodo,
+                  period: elegido,
                   price: n,
                   currency: moneda,
                 });
@@ -413,6 +425,7 @@ function PeriodRow({
         period: period.period,
         price: parseado,
         currency: moneda,
+        overwrite: true,
       });
       setEditando(false);
     });
