@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CURRENCIES, PERIODS } from '@/lib/billing';
+import { CURRENCIES, parsePrice, PERIODS } from '@/lib/billing';
 
 type Period = {
   id: string;
@@ -357,13 +357,15 @@ function PlanBlock({
           />
           <button
             type="button"
-            disabled={!precio}
+            disabled={!precio.trim()}
             onClick={() =>
               onRun(async () => {
+                const n = parsePrice(precio);
+                if (n === null) throw new Error(`"${precio}" no es un precio válido`);
                 await post('/api/billing/periods', {
                   planId: plan.id,
                   period: periodo,
-                  price: Number(precio),
+                  price: n,
                   currency: moneda,
                 });
                 setPrecio('');
@@ -397,17 +399,19 @@ function PeriodRow({
   const [precio, setPrecio] = useState(String(period.price));
   const [moneda, setMoneda] = useState(period.currency);
 
-  const cambiado = Number(precio) !== period.price || moneda !== period.currency;
+  const parseado = parsePrice(precio);
+  const cambiado = parseado !== period.price || moneda !== period.currency;
 
   function guardar() {
-    if (!precio || Number.isNaN(Number(precio))) return;
     onRun(async () => {
+      // Avisar en vez de no hacer nada: un boton que no responde parece colgado.
+      if (parseado === null) throw new Error(`"${precio}" no es un precio válido`);
       // Es el mismo upsert del alta: mismo plan + misma frecuencia corrige el
       // precio en vez de duplicar el renglón.
       await post('/api/billing/periods', {
         planId,
         period: period.period,
-        price: Number(precio),
+        price: parseado,
         currency: moneda,
       });
       setEditando(false);
@@ -446,7 +450,7 @@ function PeriodRow({
           className={`${input} w-28 py-1 tabular-nums`}
           aria-label={`Precio ${period.label}`}
         />
-        <button type="button" disabled={!cambiado} onClick={guardar} className={`${btn} py-1`}>
+        <button type="button" disabled={!cambiado || !precio.trim()} onClick={guardar} className={`${btn} py-1`}>
           Guardar
         </button>
         <button
