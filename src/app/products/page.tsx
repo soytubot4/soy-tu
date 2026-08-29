@@ -62,8 +62,8 @@ export default async function Products() {
                   period: pe.period,
                   price: Number(pe.price),
                   label: PERIODS.find((x) => x.key === pe.period)?.label ?? pe.period,
-                  precio: money(Number(pe.price)),
-                  porMes: money(perMonth(Number(pe.price), pe.period)),
+                  precio: money(Number(pe.price), pe.currency),
+                  porMes: money(perMonth(Number(pe.price), pe.period), pe.currency),
                 })),
               })),
             }}

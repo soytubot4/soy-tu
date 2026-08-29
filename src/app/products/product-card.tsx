@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { PERIODS } from '@/lib/billing';
+import { CURRENCIES, PERIODS } from '@/lib/billing';
 
 type Period = { id: string; period: string; label: string; precio: string; porMes: string };
 type Plan = { id: string; name: string; features: string[]; active: boolean; periods: Period[] };
@@ -114,6 +114,9 @@ function PlanBlock({
 }) {
   const [periodo, setPeriodo] = useState<string>('MENSUAL');
   const [precio, setPrecio] = useState('');
+  // Arranca en USD porque es como se cotiza; el cobro se convierte a pesos al
+  // oficial del dia, asi el precio no se atrasa solo.
+  const [moneda, setMoneda] = useState<string>('USD');
 
   const faltantes = PERIODS.filter((p) => !plan.periods.some((x) => x.period === p.key));
 
@@ -169,6 +172,18 @@ function PlanBlock({
               </option>
             ))}
           </select>
+          <select
+            value={moneda}
+            onChange={(e) => setMoneda(e.target.value)}
+            className={`${input} w-24`}
+            aria-label="Moneda"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <input
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
@@ -185,6 +200,7 @@ function PlanBlock({
                   planId: plan.id,
                   period: periodo,
                   price: Number(precio),
+                  currency: moneda,
                 });
                 setPrecio('');
               })
