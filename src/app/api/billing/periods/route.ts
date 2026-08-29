@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { PERIODS } from '@/lib/billing';
+import { CURRENCIES, PERIODS } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,19 +9,21 @@ const CLAVES = PERIODS.map((p) => p.key) as string[];
 
 export async function POST(req: Request) {
   await requireSuperAdmin();
-  const b = (await req.json()) as { planId?: string; period?: string; price?: number };
+  const b = (await req.json()) as { planId?: string; period?: string; price?: number; currency?: string };
   if (!b.planId || !b.period || b.price == null) {
     return NextResponse.json({ ok: false, error: 'Falta el plan, la frecuencia o el precio' }, { status: 400 });
   }
   if (!CLAVES.includes(b.period)) {
     return NextResponse.json({ ok: false, error: 'Esa frecuencia no existe' }, { status: 400 });
   }
+  const moneda = (CURRENCIES as readonly string[]).includes(b.currency ?? '') ? b.currency! : 'ARS';
+
   // upsert: cargar dos veces el mismo período es corregir el precio, no crear
   // un duplicado que despues nadie sabe cual vale.
   const per = await prisma.billingPeriod.upsert({
     where: { planId_period: { planId: b.planId, period: b.period } },
-    create: { planId: b.planId, period: b.period, price: b.price },
-    update: { price: b.price, active: true },
+    create: { planId: b.planId, period: b.period, price: b.price, currency: moneda },
+    update: { price: b.price, currency: moneda, active: true },
   });
   return NextResponse.json({ ok: true, data: per });
 }
