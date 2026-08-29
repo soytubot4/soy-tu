@@ -15,8 +15,15 @@ export async function getSupabaseServer() {
     {
       cookies: {
         getAll: () => store.getAll(),
-        setAll: () => {
-          // Server Component: no puede escribir cookies. Este panel solo lee.
+        setAll: (cookies) => {
+          // En un Server Component esto tira: no se pueden escribir cookies
+          // durante el render. Se intenta igual porque en Route Handlers sí
+          // funciona, y ahí es donde importa refrescar el token.
+          try {
+            cookies.forEach(({ name, value, options }) => store.set(name, value, options));
+          } catch {
+            /* render: lo resuelve la proxima navegacion */
+          }
         },
       },
     },

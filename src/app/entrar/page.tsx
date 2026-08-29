@@ -1,11 +1,14 @@
+import { FormEntrar } from './form';
+
 export const dynamic = 'force-dynamic';
 
 /**
  * Puerta del superadmin.
  *
- * No tiene formulario propio a propósito: la sesión es la misma que la de los
- * otros productos, así que se entra por el login que ya existe y se vuelve acá.
- * Un formulario más sería otra pantalla de contraseña para mantener.
+ * Tiene login propio, aunque la cuenta sea la misma que la de los otros
+ * productos. No alcanza con mandar a app.soytuadmin.com: la cookie de sesión vive
+ * en `.soytuadmin.com` y `soytu.com.ar` es OTRO dominio — el navegador no cruza
+ * cookies entre dominios distintos.
  */
 export default async function Entrar({
   searchParams,
@@ -25,17 +28,11 @@ export default async function Entrar({
         </p>
       ) : (
         <p className="mt-4 text-muted">
-          Entrá con tu cuenta de soytu y volvé acá. Es la misma sesión que usás en los otros
-          productos.
+          Entrá con tu cuenta de soytu. Es la misma que usás en los otros productos.
         </p>
       )}
 
-      <a
-        href="https://app.soytuadmin.com"
-        className="mt-8 rounded-lg border border-fg bg-fg px-4 py-3 text-center text-sm font-medium text-bg transition-opacity hover:opacity-85"
-      >
-        Ir a iniciar sesión
-      </a>
+      <FormEntrar />
     </main>
   );
 }
