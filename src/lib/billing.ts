@@ -41,7 +41,12 @@ export const perMonth = (price: number, period: string) => price / monthsOf(peri
  * que a otro el mismo plan.
  */
 export async function officialRate(): Promise<number> {
-  const res = await fetch('https://dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+  // Con timeout: es un tercero gratuito y si no responde no puede dejar colgado
+  // el alta de un cobro.
+  const res = await fetch('https://dolarapi.com/v1/dolares/oficial', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
   if (!res.ok) throw new Error('No se pudo traer la cotización del dólar');
   const d = (await res.json()) as { venta?: number };
   if (!d.venta) throw new Error('La cotización vino vacía');

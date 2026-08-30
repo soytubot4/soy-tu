@@ -73,7 +73,7 @@ export function worstStatus(subs: { status: string; paidUntil: Date | null }[]):
 }
 
 /** Deja anotado que paso algo con una suscripcion. */
-export function log(params: {
+export async function log(params: {
   tenantId: string;
   subscriptionId?: string | null;
   agreementId?: string | null;
@@ -82,17 +82,25 @@ export function log(params: {
   data?: object;
   actorEmail?: string | null;
 }) {
-  return prisma.subscriptionLog.create({
-    data: {
-      tenantId: params.tenantId,
-      subscriptionId: params.subscriptionId ?? null,
-      agreementId: params.agreementId ?? null,
-      kind: params.kind,
-      description: params.description,
-      data: (params.data ?? undefined) as never,
-      actorEmail: params.actorEmail ?? null,
-    },
-  });
+  try {
+    return await prisma.subscriptionLog.create({
+      data: {
+        tenantId: params.tenantId,
+        subscriptionId: params.subscriptionId ?? null,
+        agreementId: params.agreementId ?? null,
+        kind: params.kind,
+        description: params.description,
+        data: (params.data ?? undefined) as never,
+        actorEmail: params.actorEmail ?? null,
+      },
+    });
+  } catch (e) {
+    // Anotar en el historial no puede voltear un cobro. Pasa cuando el acuerdo
+    // ya se borró: Mercado Pago reintenta los avisos de un preapproval viejo
+    // para siempre, y sin esto cada reintento rompía el webhook entero.
+    console.error('[log] no se pudo anotar en el historial:', (e as Error).message);
+    return null;
+  }
 }
 
 /** Arranca la prueba de un producto que el comercio todavia no tiene contratado. */

@@ -32,15 +32,27 @@ export function backUrl(origen: string) {
 }
 
 async function mp<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token()}`,
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    cache: 'no-store',
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token()}`,
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    // Un timeout acá tiene que decir que fue un timeout. Sin esto la request
+    // queda colgada hasta que la corta el balanceador y no se loguea nada.
+    throw new Error(
+      (e as Error).name === 'TimeoutError'
+        ? 'Mercado Pago no respondió a tiempo. Probá de nuevo en un rato.'
+        : `No se pudo hablar con Mercado Pago: ${(e as Error).message}`,
+    );
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(
