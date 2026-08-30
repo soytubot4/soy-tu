@@ -124,3 +124,16 @@ export type Payment = {
 };
 
 export const getPayment = (id: string) => mp<Payment>(`/v1/payments/${id}`);
+
+/**
+ * Pone en marcha el débito. Hasta acá el preapproval existe pero no cobra: la
+ * tarjeta quedó guardada y nada más.
+ *
+ * Es lo que corresponde el día que se termina la prueba, no antes — al
+ * comerciante se le prometió que no se le cobraba nada durante el mes.
+ */
+export const activateSubscription = (id: string) =>
+  mp<Preapproval>(`/preapproval/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'authorized' }),
+  });

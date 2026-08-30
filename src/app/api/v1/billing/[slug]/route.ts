@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { validApiKey } from '@/lib/api-key';
 import { estadoDe } from '@/lib/billing-status';
+import { activarVencidos } from '@/lib/activar-vencidos';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +25,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }
   }
 
   const { slug } = await ctx.params;
+
+  // Antes de contestar: al que se le terminó la prueba y ya dejó la tarjeta, se
+  // le arranca el débito. Va acá y no en un cron porque esta consulta la hace
+  // cada producto cuando el comerciante abre su panel — en la práctica pasa el
+  // mismo día, sin sumar infraestructura.
+  const tenant = await prisma.tenant.findUnique({ where: { slug }, select: { id: true } });
+  if (tenant) await activarVencidos(tenant.id);
+
   const estado = await estadoDe(slug);
   if (!estado) {
     return NextResponse.json({ ok: false, error: 'Comercio no encontrado' }, { status: 404 });
