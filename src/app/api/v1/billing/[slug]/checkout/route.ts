@@ -33,9 +33,25 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     product?: string;
     periodId?: string;
     volverA?: string;
+    /** Solo para productos que calculan su propio precio (soytuadmin). */
+    monto?: number;
+    meses?: number;
+    detalle?: unknown;
   };
   if (!body.product) {
     return NextResponse.json({ ok: false, error: 'Falta el producto' }, { status: 400 });
+  }
+
+  // Un techo por las dudas: si un bug del producto manda un numero absurdo, es
+  // mejor rechazarlo que generarle al comerciante un debito de esa plata.
+  const TECHO = 2_000_000;
+  if (body.monto != null) {
+    if (!Number.isFinite(body.monto) || body.monto <= 0 || body.monto > TECHO) {
+      return NextResponse.json(
+        { ok: false, error: `El monto tiene que ser un numero entre 1 y ${TECHO}` },
+        { status: 400 },
+      );
+    }
   }
 
   const tenant = await prisma.tenant.findUnique({
@@ -54,33 +70,72 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     );
   }
 
-  const periodo = body.periodId
-    ? await prisma.billingPeriod.findUnique({
-        where: { id: body.periodId },
-        include: { plan: { include: { product: true } } },
-      })
-    : await prisma.billingPeriod.findFirst({
-        where: {
-          active: true,
-          period: 'MENSUAL',
-          plan: { active: true, product: { key: body.product } },
-        },
-        orderBy: { price: 'asc' },
-        include: { plan: { include: { product: true } } },
-      });
+  // Dos formas de saber cuanto cobrar, y conviven:
+  //
+  //  - Precio de lista: el producto manda `periodId` (o ninguno y se toma el
+  //    mensual mas barato). Es el caso de canje, turno, bar y cine.
+  //  - Precio calculado: el producto manda `monto`. Es soytuadmin, que arma el
+  //    precio sumando las features que tiene prendidas el comercio y por eso no
+  //    puede tener un plan de lista.
+  //
+  // El monto solo se acepta de un producto autenticado con la API key, que es
+  // servidor a servidor: nunca llega del navegador del comerciante.
+  let producto: { id: string; name: string; key: string };
+  let periodoId: string | null = null;
+  let nombrePlan: string;
+  let precio: number;
+  let moneda = 'ARS';
+  let cotizacion: number | null = null;
+  let meses: number;
 
-  if (!periodo || periodo.plan.product.key !== body.product) {
-    return NextResponse.json(
-      { ok: false, error: `No hay un plan con precio cargado para ${body.product}` },
-      { status: 404 },
-    );
+  if (body.monto != null) {
+    const p = await prisma.billingProduct.findUnique({ where: { key: body.product } });
+    if (!p) {
+      return NextResponse.json(
+        { ok: false, error: `No existe el producto ${body.product}` },
+        { status: 404 },
+      );
+    }
+    producto = p;
+    precio = body.monto;
+    // Los meses vienen del producto porque es el que sabe si vendio mensual o
+    // anual; sin dato, mensual.
+    meses = Number.isInteger(body.meses) && body.meses! > 0 ? body.meses! : 1;
+    nombrePlan = 'a medida';
+  } else {
+    const periodo = body.periodId
+      ? await prisma.billingPeriod.findUnique({
+          where: { id: body.periodId },
+          include: { plan: { include: { product: true } } },
+        })
+      : await prisma.billingPeriod.findFirst({
+          where: {
+            active: true,
+            period: 'MENSUAL',
+            plan: { active: true, product: { key: body.product } },
+          },
+          orderBy: { price: 'asc' },
+          include: { plan: { include: { product: true } } },
+        });
+
+    if (!periodo || periodo.plan.product.key !== body.product) {
+      return NextResponse.json(
+        { ok: false, error: `No hay un plan con precio cargado para ${body.product}` },
+        { status: 404 },
+      );
+    }
+
+    producto = periodo.plan.product;
+    periodoId = periodo.id;
+    nombrePlan = periodo.plan.name;
+    precio = Number(periodo.price);
+    moneda = periodo.currency;
+    meses = monthsOf(periodo.period);
   }
 
   // Cotizado en dólares, cobrado en pesos al oficial del día. La cotización se
   // guarda con el acuerdo para poder explicar después por qué le salió eso.
-  const precio = Number(periodo.price);
-  let cotizacion: number | null = null;
-  if (periodo.currency === 'USD') {
+  if (moneda === 'USD') {
     try {
       cotizacion = await officialRate();
     } catch {
@@ -90,8 +145,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
       );
     }
   }
-  const enPesos = toPesos(precio, periodo.currency, cotizacion ?? 1);
-  const producto = periodo.plan.product;
+  const enPesos = toPesos(precio, moneda, cotizacion ?? 1);
 
   const acuerdo = await prisma.$transaction(async (tx) => {
     const a = await tx.billingAgreement.create({
@@ -99,7 +153,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
         tenantId: tenant.id,
         status: 'pending',
         amount: enPesos,
-        months: monthsOf(periodo.period),
+        months: meses,
         fxRate: cotizacion,
         mpPayerEmail: email,
         startedAt: new Date(),
@@ -112,14 +166,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
       create: {
         tenantId: tenant.id,
         productId: producto.id,
-        billingPeriodId: periodo.id,
+        billingPeriodId: periodoId,
         agreementId: a.id,
         status: 'pending',
         amount: precio,
-        currency: periodo.currency,
+        currency: moneda,
         startedAt: new Date(),
       },
-      update: { billingPeriodId: periodo.id, agreementId: a.id, amount: precio, currency: periodo.currency },
+      update: { billingPeriodId: periodoId, agreementId: a.id, amount: precio, currency: moneda },
     });
     return a;
   });
@@ -129,10 +183,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     pre = await createSubscription({
       subscriptionId: acuerdo.id,
       nombreComercio: tenant.name,
-      detalle: `${producto.name} ${periodo.plan.name}`,
+      detalle: `${producto.name} ${nombrePlan}`,
       emailPagador: email,
       monto: enPesos,
-      mesesPorCobro: monthsOf(periodo.period),
+      mesesPorCobro: meses,
       volverA: body.volverA ?? backUrl(new URL(req.url).origin),
     });
   } catch (e) {
@@ -159,13 +213,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ slug: string }
     agreementId: acuerdo.id,
     kind: 'plan-cambiado',
     description: `Se generó el link de pago de ${producto.name} · ${money(enPesos)} cada ${
-      monthsOf(periodo.period) === 1 ? 'mes' : `${monthsOf(periodo.period)} meses`
+      meses === 1 ? 'mes' : `${meses} meses`
     }`,
-    data: { desde: body.product, periodId: periodo.id, enPesos, cotizacion },
+    // El detalle es lo que manda el producto explicando como armo el precio (que
+    // features, a cuanto cada una). Es lo unico que despues permite contestarle a
+    // un comerciante por que le cobraron eso.
+    data: { desde: body.product, periodId: periodoId, enPesos, cotizacion, detalle: body.detalle ?? null },
   });
 
   return NextResponse.json({
     ok: true,
-    data: { link: pre.init_point, enPesos, cotizacion, plan: periodo.plan.name },
+    data: { link: pre.init_point, enPesos, cotizacion, plan: nombrePlan },
   });
 }
