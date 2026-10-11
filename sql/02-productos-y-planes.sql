@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Catálogo de venta: Producto → Plan → Período
 --
--- Tres niveles, como en nubo, porque cada uno responde una pregunta distinta:
+-- Tres niveles, porque cada uno responde una pregunta distinta:
 --
 --   Producto  qué se vende            soytuadmin, soytucanje, soytuturno…
 --   Plan      cuánto trae             Básico, Full — según las features

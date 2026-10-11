@@ -5,8 +5,6 @@
 -- producto tiene su precio: con una sola fila no hay forma de cobrarle los tres
 -- ni de saber cuál de ellos dejó de pagar.
 --
--- Es el mismo modelo que usa nubo (`one_subscription_per_product_customer`).
---
 -- Estas tablas son de soytu nada más: ningún otro repo las declara, así que no
 -- hay que replicar nada. La base es compartida, el SQL se corre una sola vez.
 

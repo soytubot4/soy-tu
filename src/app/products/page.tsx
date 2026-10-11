@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 /**
  * El catálogo de venta: qué se vende, en qué planes y a qué precio.
  *
- * Tres niveles, como en nubo: Producto → Plan → Período. El precio vive en el
+ * Tres niveles: Producto → Plan → Período. El precio vive en el
  * período y no en el plan porque cambia con la frecuencia — pagar por trimestre
  * sale menos por mes, y si el precio estuviera en el plan habría que duplicar el
  * plan entero para cobrar trimestral.
