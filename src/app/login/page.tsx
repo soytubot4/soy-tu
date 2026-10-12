@@ -20,7 +20,7 @@ export default async function Entrar({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">soytu · panel</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">SOY <span className="text-primary-tx">TU</span> · panel</h1>
 
       {sinAcceso ? (
         <p className="mt-4 text-muted">

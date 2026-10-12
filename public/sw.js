@@ -10,7 +10,7 @@
  * sitio, se cambia y el `activate` borra las viejas. Sin eso, un visitante podría
  * quedarse con la web de hace seis meses para siempre.
  */
-const CACHE = "soytu-v1";
+const CACHE = "soytu-v2";
 
 self.addEventListener("install", (event) => {
   // Sin waitUntil de precarga: el HTML y los assets entran solos en el primer

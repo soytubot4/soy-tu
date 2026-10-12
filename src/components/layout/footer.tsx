@@ -4,7 +4,9 @@ export function Footer() {
   return (
     <footer className="mx-auto max-w-5xl px-6 py-10 text-sm text-muted sm:py-14">
       <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
-        <span>&copy; {new Date().getFullYear()} soytu</span>
+        <span>
+          &copy; {new Date().getFullYear()} SOY <span className="text-primary-tx">TU</span>
+        </span>
         <span className="flex gap-4">
           <a
             href={WHATSAPP}

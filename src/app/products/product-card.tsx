@@ -31,8 +31,8 @@ export type Product = {
 };
 
 const input =
-  'rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-fg';
-const btn = 'rounded-lg border border-fg bg-fg px-3 py-2 text-sm font-medium text-bg disabled:opacity-40';
+  'rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-primary-tx';
+const btn = 'btn btn-primary';
 const btnGhost = 'rounded-lg border border-line px-3 py-2 text-sm';
 const link = 'text-[13px] text-muted underline hover:text-fg';
 

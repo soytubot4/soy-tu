@@ -74,7 +74,7 @@ export function EditableRow({ t, children }: { t: TenantRow; children: React.Rea
                 <input
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  className="max-w-sm rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-fg"
+                  className="max-w-sm rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-primary-tx"
                 />
               </label>
 
@@ -93,7 +93,7 @@ export function EditableRow({ t, children }: { t: TenantRow; children: React.Rea
                           )
                         }
                         className={`rounded-full border px-3 py-1 text-[13px] ${
-                          puesto ? 'border-fg' : 'border-line text-muted'
+                          puesto ? 'border-primary text-primary-tx' : 'border-line text-muted'
                         }`}
                       >
                         {p.nombre}
@@ -115,7 +115,7 @@ export function EditableRow({ t, children }: { t: TenantRow; children: React.Rea
                   type="button"
                   onClick={guardar}
                   disabled={!sucio || guardando}
-                  className="rounded-lg border border-fg bg-fg px-4 py-2 text-sm font-medium text-bg disabled:opacity-40"
+                  className="btn btn-primary"
                 >
                   {guardando ? 'Guardando…' : 'Guardar'}
                 </button>

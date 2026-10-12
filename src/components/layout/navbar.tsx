@@ -1,4 +1,5 @@
 import { WHATSAPP } from "@/components/productos";
+import { LogoWordmark } from "@/components/logo";
 
 export function Navbar() {
   return (
@@ -7,10 +8,10 @@ export function Navbar() {
         className="mx-auto flex h-15 max-w-5xl items-center justify-between px-6"
         aria-label="Principal"
       >
-        <a href="#top" className="text-[17px] font-semibold tracking-tight">
-          soytu
+        <a href="#top" className="text-[17px]">
+          <LogoWordmark />
         </a>
-        <div className="hidden gap-6 text-sm text-muted md:flex">
+        <div className="hidden gap-6 text-sm text-muted-2 md:flex">
           <a href="#productos" className="transition-colors hover:text-fg">
             Productos
           </a>
@@ -21,12 +22,7 @@ export function Navbar() {
             Contacto
           </a>
         </div>
-        <a
-          href={WHATSAPP}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-lg border border-fg bg-fg px-4 py-2 text-sm font-medium text-bg transition-opacity hover:opacity-85"
-        >
+        <a href={WHATSAPP} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
           Hablemos
         </a>
       </nav>

@@ -13,8 +13,8 @@ type Producto = {
 };
 
 const input =
-  'rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-fg';
-const btn = 'rounded-lg border border-fg bg-fg px-3 py-2 text-sm font-medium text-bg disabled:opacity-40';
+  'rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-primary-tx';
+const btn = 'btn btn-primary';
 const etiqueta = (p: string) => PERIODS.find((x) => x.key === p)?.label ?? p;
 
 /**

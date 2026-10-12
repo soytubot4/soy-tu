@@ -1,5 +1,5 @@
 /**
- * Los seis productos, con su sitio propio.
+ * Los productos de la suite, con su sitio propio.
  *
  * soytu no vende: explica y deriva. Por eso acá no hay precios — cada producto
  * los muestra en su sitio, que es donde se pueden mantener sin que se
@@ -10,6 +10,8 @@
 export type Producto = {
   slug: string;
   nombre: string;
+  /** El nombre corto que va en la pill: "SOY TU Admin". */
+  marca: string;
   /** De qué se ocupa, en dos palabras. */
   rubro: string;
   descripcion: string;
@@ -18,12 +20,19 @@ export type Producto = {
   paraQuien: string;
   sitio: string;
   inicial: string;
+  /** El color del espectro que identifica al producto (guía de marca). */
+  color: string;
+  /** El mismo color pero apto para TEXTO sobre Void (Bot usa uno más claro). */
+  colorTx: string;
 };
 
 export const PRODUCTS: Producto[] = [
   {
     slug: "soytuadmin",
     nombre: "soytuadmin",
+    marca: "Admin",
+    color: "#FF7A1F",
+    colorTx: "#FF7A1F",
     rubro: "Gestión",
     inicial: "A",
     descripcion:
@@ -33,7 +42,7 @@ export const PRODUCTS: Producto[] = [
       "Ventas, compras y proveedores",
       "Facturación electrónica AFIP",
       "Caja diaria por sucursal",
-      "Mercado Libre, Mercado Payment y Tienda Nube",
+      "Mercado Libre, Mercado Pago y Tienda Nube",
     ],
     paraQuien: "Para comercios, distribuidoras y mayoristas.",
     sitio: "https://soytuadmin.com",
@@ -41,6 +50,9 @@ export const PRODUCTS: Producto[] = [
   {
     slug: "soytubot",
     nombre: "soytubot",
+    marca: "Bot",
+    color: "#9B3DFF",
+    colorTx: "#A55CFF",
     rubro: "Atención automática",
     inicial: "B",
     descripcion:
@@ -57,6 +69,9 @@ export const PRODUCTS: Producto[] = [
   {
     slug: "soytucanje",
     nombre: "soytucanje",
+    marca: "Canje",
+    color: "#00E5A0",
+    colorTx: "#00E5A0",
     rubro: "Fidelidad",
     inicial: "C",
     descripcion:
@@ -73,6 +88,9 @@ export const PRODUCTS: Producto[] = [
   {
     slug: "soytuturno",
     nombre: "soytuturno",
+    marca: "Turno",
+    color: "#00C8FF",
+    colorTx: "#00C8FF",
     rubro: "Agenda",
     inicial: "T",
     descripcion:
@@ -89,6 +107,9 @@ export const PRODUCTS: Producto[] = [
   {
     slug: "soytubar",
     nombre: "soytubar",
+    marca: "Bar",
+    color: "#FF2ED1",
+    colorTx: "#FF2ED1",
     rubro: "Salón",
     inicial: "R",
     descripcion:
@@ -106,6 +127,9 @@ export const PRODUCTS: Producto[] = [
   {
     slug: "soytucine",
     nombre: "soytucine",
+    marca: "Cine",
+    color: "#FF3D6E",
+    colorTx: "#FF3D6E",
     rubro: "Contenido con IA",
     inicial: "N",
     descripcion:

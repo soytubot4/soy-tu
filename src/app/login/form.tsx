@@ -30,7 +30,7 @@ export function LoginForm() {
   }
 
   const campo =
-    'w-full rounded-lg border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:border-fg';
+    'w-full rounded-lg border border-line bg-bg px-3 py-2.5 text-sm outline-none focus:border-primary-tx';
 
   return (
     <form onSubmit={signIn} className="mt-8 space-y-4">
@@ -66,7 +66,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={entrando}
-        className="w-full rounded-lg border border-fg bg-fg px-4 py-3 text-sm font-medium text-bg transition-opacity hover:opacity-85 disabled:opacity-50"
+        className="btn btn-primary w-full"
       >
         {entrando ? 'Entrando…' : 'Entrar'}
       </button>

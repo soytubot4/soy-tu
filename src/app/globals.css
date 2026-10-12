@@ -1,42 +1,48 @@
 @import "tailwindcss";
 
 /**
- * Blanco y negro, sin medias tintas.
+ * Sistema de marca SOY TU (guía v1.0, oct 2026).
  *
- * Los grises son los únicos tonos: no hay color de acento a propósito. Cuando
- * todo es blanco y negro, un borde que cambia ya es suficiente señal.
+ * El sitio de la suite usa la marca madre: fondo Void, texto Luz y el azul
+ * eléctrico como ÚNICO acento institucional. Los colores del espectro
+ * (naranja, menta, violeta…) aparecen solamente identificando productos.
  *
- * Sigue el tema del sistema operativo: negro por defecto, blanco si el visitante
- * tiene el equipo en claro.
+ * Siempre oscuro, a propósito: la marca vive sobre Void, no hay tema claro.
  */
 @theme inline {
   --color-bg: var(--bg);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-card: var(--card);
-  --font-sans: var(--font-geist);
+  --color-grafito: var(--grafito);
+  --color-primary: var(--primary);
+  --color-primary-tx: var(--primary-tx);
+  --font-sans: var(--font-montserrat);
 }
 
 :root {
-  --bg: #000000;
-  --fg: #ffffff;
-  --muted: #888888;
-  --line: #1f1f1f;
-  --line-strong: #333333;
-  --card: #0a0a0a;
-}
+  /* Marca madre */
+  --bg: #07071a; /* Void */
+  --fg: #f4f6ff; /* Luz */
+  --muted: #b8bcd8;
+  --muted-2: #8a8fb0;
+  --line: #22223f;
+  --line-strong: #2a2a48;
+  --card: #0b0b20;
+  --grafito: #14142b;
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #ffffff;
-    --fg: #000000;
-    --muted: #666666;
-    --line: #eaeaea;
-    --line-strong: #d4d4d4;
-    --card: #fafafa;
-  }
+  /* Azul eléctrico: el acento institucional */
+  --primary: #1f5bff;
+  --primary-hover: #4174ff;
+  --primary-pressed: #194bd1;
+  --primary-tx: #6f93ff; /* el azul para TEXTO sobre Void (el pleno no contrasta) */
+
+  /* Deshabilitado: igual en todos los productos */
+  --disabled-bg: #14142b;
+  --disabled-tx: #5a5e80;
 }
 
 html {
@@ -47,6 +53,89 @@ body {
   background: var(--bg);
   color: var(--fg);
   letter-spacing: -0.011em;
+}
+
+/**
+ * Botones de la guía: alto 40, padding 16, radio 8, texto 14 Medium,
+ * borde 1.5 reservado en todos para que midan lo mismo.
+ * Principal: relleno sólido (uno por pantalla), glow solo en hover.
+ * Secundario: contorno de color, fondo al 12% en hover y 20% presionado.
+ * Texto: solo la palabra en color.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    color 0.15s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 0 14px rgb(31 91 255 / 0.55);
+}
+.btn-primary:active {
+  background: var(--primary-pressed);
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--primary-tx);
+  border-color: var(--primary);
+}
+.btn-secondary:hover {
+  background: rgb(31 91 255 / 0.12);
+}
+.btn-secondary:active {
+  background: rgb(31 91 255 / 0.2);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--primary-tx);
+}
+.btn-ghost:hover {
+  background: rgb(31 91 255 / 0.12);
+}
+.btn-ghost:active {
+  background: rgb(31 91 255 / 0.2);
+}
+
+.btn:disabled,
+.btn-disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-tx);
+  border-color: transparent;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/** La pill de producto: borde y nombre en el color del producto. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
