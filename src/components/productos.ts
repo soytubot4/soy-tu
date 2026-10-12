@@ -24,6 +24,15 @@ export type Producto = {
   color: string;
   /** El mismo color pero apto para TEXTO sobre Void (Bot usa uno más claro). */
   colorTx: string;
+  /**
+   * Si ya existe su ladrillo en `/public/marca/<marca>.svg`.
+   *
+   * En `false` la grilla dibuja un hueco con el nombre y el color del producto
+   * en vez de pedir un archivo que no está: una imagen rota en la home de la
+   * suite es peor que no tener arte todavía. Cuando entre el SVG, poner `true`
+   * y listo — no hay nada más que tocar.
+   */
+  arte: boolean;
 };
 
 export const PRODUCTS: Producto[] = [
@@ -31,6 +40,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytuadmin",
     nombre: "soytuadmin",
     marca: "Admin",
+    arte: true,
     color: "#FF7A1F",
     colorTx: "#FF7A1F",
     rubro: "Gestión",
@@ -51,6 +61,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytubot",
     nombre: "soytubot",
     marca: "Bot",
+    arte: true,
     color: "#9B3DFF",
     colorTx: "#A55CFF",
     rubro: "Atención automática",
@@ -70,6 +81,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytucanje",
     nombre: "soytucanje",
     marca: "Canje",
+    arte: true,
     color: "#00E5A0",
     colorTx: "#00E5A0",
     rubro: "Fidelidad",
@@ -89,6 +101,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytuturno",
     nombre: "soytuturno",
     marca: "Turno",
+    arte: true,
     color: "#00C8FF",
     colorTx: "#00C8FF",
     rubro: "Agenda",
@@ -108,6 +121,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytubar",
     nombre: "soytubar",
     marca: "Bar",
+    arte: true,
     color: "#FF2ED1",
     colorTx: "#FF2ED1",
     rubro: "Salón",
@@ -128,6 +142,7 @@ export const PRODUCTS: Producto[] = [
     slug: "soytucine",
     nombre: "soytucine",
     marca: "Cine",
+    arte: true,
     color: "#FF3D6E",
     colorTx: "#FF3D6E",
     rubro: "Contenido con IA",
@@ -141,6 +156,49 @@ export const PRODUCTS: Producto[] = [
     ],
     paraQuien: "Para el que vende con la foto.",
     sitio: "https://soytucine.com",
+  },
+  {
+    slug: "soytucontador",
+    nombre: "soytucontador",
+    marca: "Contador",
+    // Todavía sin ladrillo: la grilla le dibuja el hueco.
+    arte: false,
+    color: "#FFC53D",
+    colorTx: "#FFC53D",
+    rubro: "Estudios contables",
+    inicial: "O",
+    descripcion:
+      "Todo lo de ARCA de cada cliente en un solo lugar: situación fiscal, comprobantes, VEPs y deudas, sin entrar uno por uno.",
+    features: [
+      "Perfil fiscal de cada contribuyente",
+      "Comprobantes emitidos y recibidos",
+      "VEPs y vencimientos",
+      "Deuda y cuenta corriente de ARCA",
+      "Todos tus clientes en un panel",
+    ],
+    paraQuien: "Para el estudio que sigue a decenas de contribuyentes.",
+    sitio: "https://soytucontador.com",
+  },
+  {
+    slug: "soytuinmobiliaria",
+    nombre: "soytuinmobiliaria",
+    marca: "Inmobiliaria",
+    arte: false,
+    color: "#5B8CFF",
+    colorTx: "#5B8CFF",
+    rubro: "Inmobiliarias",
+    inicial: "I",
+    descripcion:
+      "Las propiedades, las consultas y el seguimiento en un solo lugar. El interesado pregunta y el bot le contesta con lo que hay publicado.",
+    features: [
+      "Carga de propiedades con fotos",
+      "Tu web con el catálogo al día",
+      "Consultas, visitas y seguimiento",
+      "Bot que filtra por lo que busca cada uno",
+      "Qué se consulta y qué no",
+    ],
+    paraQuien: "Para inmobiliarias y martilleros.",
+    sitio: "https://soytuinmobiliaria.com",
   },
 ];
 

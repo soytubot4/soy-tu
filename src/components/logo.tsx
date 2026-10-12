@@ -13,6 +13,35 @@ export function LogoProducto({ producto, className = "" }: { producto: string; c
   return <img src={`/marca/${producto}.svg`} alt="" aria-hidden="true" className={className} />;
 }
 
+/**
+ * El lugar del ladrillo mientras no está su SVG.
+ *
+ * Ocupa el mismo alto que los demás para que la grilla no se desarme, y se ve
+ * deliberado: el ícono roto del navegador en la home de la suite dice "esto
+ * está a medio hacer" mucho más fuerte que un hueco prolijo.
+ */
+export function LogoPendiente({
+  marca,
+  color,
+  className = "",
+}: {
+  marca: string;
+  color: string;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex items-center justify-center rounded-xl border border-dashed px-5 ${className}`}
+      style={{ borderColor: `${color}59`, color }}
+    >
+      <span className="text-[15px] font-semibold tracking-tight">
+        SOY TU <span className="font-bold">{marca}</span>
+      </span>
+    </span>
+  );
+}
+
 /** La torre: todos los productos apilados. "Se suman entre ellos". */
 export function LogoTorre({ className = "" }: { className?: string }) {
   return <img src="/marca/torre.svg" alt="" aria-hidden="true" className={className} />;

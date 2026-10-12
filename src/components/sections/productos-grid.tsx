@@ -1,5 +1,5 @@
 import { PRODUCTS } from "@/components/productos";
-import { LogoProducto } from "@/components/logo";
+import { LogoPendiente, LogoProducto } from "@/components/logo";
 
 /**
  * Las tarjetas son links: cada producto tiene su propio sitio y ahí están los
@@ -38,7 +38,11 @@ export function ProductosGrid() {
             style={{ "--pc": p.color, "--glow": `${p.color}2E` } as React.CSSProperties}
             className="group flex flex-col rounded-xl border border-line bg-card p-7 text-left transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-(--pc) hover:shadow-[0_0_24px_var(--glow)]"
           >
-            <LogoProducto producto={p.marca.toLowerCase()} className="mb-4 h-24 self-start" />
+            {p.arte ? (
+              <LogoProducto producto={p.marca.toLowerCase()} className="mb-4 h-24 self-start" />
+            ) : (
+              <LogoPendiente marca={p.marca} color={p.color} className="mb-4 h-24 self-start" />
+            )}
             <h3 className="text-[19px] font-semibold tracking-[-0.01em]">{p.nombre}</h3>
             <p className="mt-1 text-[13px] text-muted-2">{p.rubro}</p>
             <p className="mt-4 text-[15px] text-pretty text-muted">{p.descripcion}</p>
