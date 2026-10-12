@@ -1,11 +1,30 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 /**
- * El favicon: el ladrillo de la marca simplificado a 32 px (a ese tamaño los
- * tetones y el texto no se leen; queda la silueta Luz sobre Void con el halo
- * azul, que es lo que identifica).
+ * El favicon: el ladrillo OFICIAL de la marca sobre Void.
+ *
+ * Es el mismo `/public/marca/soy-tu.svg` que usa toda la web, embebido como
+ * data URI. Antes acá había tres polígonos dibujados a mano que imitaban un
+ * ladrillo: a 32 px pasaba por una caja azul cualquiera y, peor, no era el
+ * ladrillo — si se retoca la marca, un dibujo aparte queda desfasado y nadie
+ * se acuerda de que existe.
+ *
+ * Sin fondo: el PNG sale transparente y el ladrillo se apoya en el color de la
+ * barra, sea clara u oscura. Se banca las dos porque no es blanco plano — las
+ * caras laterales y la leyenda son Void, así que sobre fondo claro lo que se
+ * ve es ese contraste, y sobre oscuro, la cara Luz y el halo.
+ *
+ * La leyenda "SOY TU" del ladrillo no se lee a este tamaño, y está bien: lo que
+ * identifica en la pestaña es la silueta con los tres tetones.
  */
-export const size = { width: 32, height: 32 };
+const LADRILLO = readFileSync(join(process.cwd(), "public", "marca", "soy-tu.svg"));
+const LADRILLO_URI = `data:image/svg+xml;base64,${LADRILLO.toString("base64")}`;
+
+// 128 y no 32: el navegador lo baja a 16/32 con un filtro mucho mejor que el
+// rasterizado directo a 32, donde los tetones y el borde se hacían puré.
+export const size = { width: 128, height: 128 };
 export const contentType = "image/png";
 
 export default function Icon() {
@@ -18,17 +37,10 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#07071A",
         }}
       >
-        <svg width="28" height="28" viewBox="0 0 100 100">
-          {/* tapa */}
-          <polygon points="14,40 74,30 92,20 32,30" fill="#F4F6FF" stroke="#1F5BFF" strokeWidth="4" strokeLinejoin="round" />
-          {/* lateral */}
-          <polygon points="74,31 92,21 92,66 74,76" fill="#07071A" stroke="#1F5BFF" strokeWidth="4" strokeLinejoin="round" />
-          {/* frente */}
-          <polygon points="14,41 74,31 74,76 14,86" fill="#F4F6FF" stroke="#1F5BFF" strokeWidth="4" strokeLinejoin="round" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={LADRILLO_URI} width={128} height={88} alt="" />
       </div>
     ),
     size,
