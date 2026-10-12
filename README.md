@@ -1,21 +1,18 @@
 # soytu.com.ar
 
-Sitio de la suite. Explica los seis productos y cómo se combinan.
+Sitio de la suite + billing. Explica los productos y cómo se combinan, y es
+**la única verdad de las suscripciones y cobros** del ecosistema (Mercado
+Pago): los demás productos le preguntan por API si un comercio pagó.
 
-Mismo stack que el resto de las webs: **Next 16 + React 19 + Tailwind 4**, con
-`output: "export"` — o sea que `next build` deja un sitio estático en `out/`.
+Stack: **Next 16 + React 19 + Tailwind 4** con yarn. OJO: ya **no** es un
+export estático — `/app` (el panel) necesita servidor, así que se deploya
+como Web Service (ver "Deploy" más abajo). El directorio `out/` es resto del
+export viejo.
 
 ## Ver en local
 
     yarn
-    yarn dev
-
-## Deploy
-
-| Campo | Valor |
-|---|---|
-| Build command | `yarn build` |
-| Output directory | `out` |
+    yarn dev -p 4600          # el panel: app.localhost:4600
 
 ## Se cachea entero
 
@@ -36,8 +33,7 @@ que no existe.
 
 - Blanco y negro, sin colores de acento. Sigue el tema del sistema operativo:
   oscuro por defecto y claro si el visitante tiene el equipo en claro.
-- El dominio `soytu.com.ar` resuelve en DNS pero al 27/08/2026 todavía no servía
-  nada. El footer de la landing de soytubot ya apunta acá.
+- El footer de la landing de soytubot apunta acá.
 - Los textos de cada producto salen de lo que hace hoy cada sistema. Si se suma
   una funcionalidad grande, conviene actualizarlos.
 
