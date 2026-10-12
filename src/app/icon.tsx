@@ -16,8 +16,12 @@ import { ImageResponse } from "next/og";
  * caras laterales y la leyenda son Void, así que sobre fondo claro lo que se
  * ve es ese contraste, y sobre oscuro, la cara Luz y el halo.
  *
- * La leyenda "SOY TU" del ladrillo no se lee a este tamaño, y está bien: lo que
- * identifica en la pestaña es la silueta con los tres tetones.
+ * Va a 1,4x del lienzo y se le recortan las puntas. El ladrillo es ancho y
+ * bajo, y centrado entero en un cuadrado usaba el 98% del ancho pero solo el
+ * 66% del alto: en la pestaña se veía diminuto. Agrandarlo hasta que las dos
+ * esquinas se vayan de cuadro es lo único que lo hace crecer, porque el límite
+ * es la forma del ladrillo y no el encuadre. Más de esto empieza a comerse el
+ * "TU" de la leyenda.
  */
 const LADRILLO = readFileSync(join(process.cwd(), "public", "marca", "soy-tu.svg"));
 const LADRILLO_URI = `data:image/svg+xml;base64,${LADRILLO.toString("base64")}`;
@@ -37,10 +41,12 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          // Lo que se sale por las puntas se recorta: ver abajo por qué.
+          overflow: "hidden",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LADRILLO_URI} width={128} height={88} alt="" />
+        <img src={LADRILLO_URI} width={179} height={123} alt="" />
       </div>
     ),
     size,
